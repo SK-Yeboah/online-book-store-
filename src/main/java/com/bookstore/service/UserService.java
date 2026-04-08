@@ -114,18 +114,16 @@ public class UserService {
 
     // Refresh
     public JwtResponse refresh(String rawRefreshToken){
-       
-            RefreshToken current  = refreshTokenService.validateRefreshToken(rawRefreshToken);
-            RefreshToken rotated = refreshTokenService.rotateRefreshToken(current);
-            UserDetails userDetails = userDetailsService.loadUserByUsername(current.getUser().getUsername());
-
-            String accessToken = jwtutil.generateAccessToken(userDetails);
-            log.info("Token rotated successfully for user: {}", userDetails.getUsername().length());
-            return new JwtResponse(
-                accessToken, rotated.getToken(), current.getUser().getUsername(), current.getUser().getRole().name()
-
-            );
-        
+        RefreshToken current = refreshTokenService.validateRefreshToken(rawRefreshToken);
+        RefreshToken rotated = refreshTokenService.rotateRefreshToken(current);
+        // rotated.getUser() was fully loaded inside rotateRefreshToken's @Transactional,
+        // so its scalar fields are in memory. current.getUser() is a detached lazy proxy
+        // that throws LazyInitializationException outside its original session.
+        String username = rotated.getUser().getUsername();
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        String accessToken = jwtutil.generateAccessToken(userDetails);
+        log.info("Token rotated successfully for user (usernameLen={})", username.length());
+        return new JwtResponse(accessToken, rotated.getToken(), username, rotated.getUser().getRole().name());
     }
 
     // Logout 

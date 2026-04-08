@@ -40,6 +40,12 @@ class AccountLockServiceTest {
     @Test
     @DisplayName("concurrent failures — account locks exactly at maxAttempts")
     void concurrentFailures_lockExactlyAtMaxAttempts() throws InterruptedException {
+        // Pre-create the row so all threads acquire a pessimistic write lock on the
+        // same existing row. Without this, all 10 threads race to INSERT the first row
+        // simultaneously; only 1 INSERT wins and the others get a DataIntegrityViolation
+        // that corrupts the EntityManager, leaving failedAttempts = 1 not 5.
+        loginAttemptRepository.save(new LoginAttempt(TEST_USER));
+
         int threads = 10;
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         CountDownLatch latch = new CountDownLatch(1);

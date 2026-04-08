@@ -70,6 +70,14 @@ public class AccountLockServiceImp implements AccountLockService {
         String normalized = normalizedUsername(username);
         LoginAttempt attempt = loadOrCreateLocked(normalized);
 
+        // If the account is already locked, don't increment further — just re-throw.
+        // In normal login flow checkNotLocked() prevents reaching here, but direct
+        // calls (e.g. from concurrent tests or internal code) should still be safe.
+        if (attempt.isCurrentlyLocked()) {
+            long minutesLeft = Math.max(1, ChronoUnit.MINUTES.between(LocalDateTime.now(), attempt.getLockedUntil()));
+            throw new AccountLockedException(minutesLeft);
+        }
+
         LocalDateTime now = LocalDateTime.now();
         resetStaleFailureWindowIfNeeded(attempt, now);
 

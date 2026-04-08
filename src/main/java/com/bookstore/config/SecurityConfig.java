@@ -76,7 +76,9 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
+                // Only the three truly-public auth endpoints are permitAll.
+                // /api/auth/logout and /api/auth/logout-all require a valid JWT.
+                .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/refresh").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/books/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN")
@@ -85,17 +87,19 @@ public class SecurityConfig {
             )
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(ex -> ex
-            .authenticationEntryPoint((request, response, e) ->{
+            .authenticationEntryPoint((request, response, e) -> {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
                 response.setCharacterEncoding("UTF-8");
-                response.getWriter().write("{\"error\": \"Unauthorized\",\"message\":\"Authentication required\"}");
+                response.getWriter().write(
+                    "{\"status\":401,\"error\":\"UNAUTHORIZED\",\"message\":\"Authentication required\",\"path\":\"" + request.getRequestURI() + "\"}");
             })
-            .accessDeniedHandler((request, response, e) ->{
+            .accessDeniedHandler((request, response, e) -> {
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 response.setContentType("application/json");
                 response.setCharacterEncoding("UTF-8");
-                response.getWriter().write("{\"error\": \"Forbidden\", \"message\": \"Access Denied\"}");
+                response.getWriter().write(
+                    "{\"status\":403,\"error\":\"FORBIDDEN\",\"message\":\"You do not have permission to perform this action\",\"path\":\"" + request.getRequestURI() + "\"}");
             })
         )
         // .addFilterBefore(rateLimitFilter, JwtFilter.class)
