@@ -63,12 +63,15 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
 
     // Rotate Token — marks old token used=true (kept for theft detection), issues a new one.
-    // The scheduled cleanup will delete it once it expires.
+    // Re-fetches the token within this transaction to avoid LazyInitializationException
+    // when the entity was loaded in a different (now-closed) Hibernate session.
     @Transactional
     public RefreshToken rotateRefreshToken(RefreshToken oldToken){
-        oldToken.setUsed(true);
-        refreshTokenRepository.save(oldToken);
-        return createRefreshToken(oldToken.getUser().getUsername());
+        RefreshToken managed = refreshTokenRepository.findByToken(oldToken.getToken())
+                .orElseThrow(() -> new InvalidTokenException("Token not found during rotation"));
+        managed.setUsed(true);
+        refreshTokenRepository.save(managed);
+        return createRefreshToken(managed.getUser().getUsername());
     }
 
     // Revoke single token

@@ -4,6 +4,7 @@ import com.bookstore.entity.LoginAttempt;
 import com.bookstore.exception.AccountLockedException;
 import com.bookstore.exception.InvalidCredentialsException;
 import com.bookstore.repository.LoginAttemptRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ class AccountLockServiceTest {
     private static final String TEST_USER = "concurrentuser";
 
     @BeforeEach
+    @AfterEach
     void cleanUp() {
         loginAttemptRepository.findByUsername(TEST_USER)
                 .ifPresent(loginAttemptRepository::delete);
