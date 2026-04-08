@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- ── Dev profile: human-readable coloured console output ────────────── -->
+    <springProfile name="dev | default">
+        <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%clr(%d{HH:mm:ss.SSS}){faint} %clr(%5p) %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n</pattern>
+            </encoder>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+        <logger name="com.bookstore" level="DEBUG"/>
+        <logger name="org.springframework.security" level="WARN"/>
+        <logger name="com.zaxxer.hikari" level="WARN"/>
+    </springProfile>
+
+    <!-- ── Prod profile: structured JSON for log aggregators ──────────────── -->
+    <!-- Requires logstash-logback-encoder on the classpath (added below).     -->
+    <!-- Each log line is a single JSON object — easy to query in CloudWatch,  -->
+    <!-- Datadog, Loki, etc.                                                   -->
+    <springProfile name="prod">
+        <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <includeMdcKeyName>traceId</includeMdcKeyName>
+                <includeMdcKeyName>spanId</includeMdcKeyName>
+            </encoder>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="JSON_CONSOLE"/>
+        </root>
+        <logger name="com.bookstore" level="INFO"/>
+        <logger name="org.springframework.security" level="WARN"/>
+        <logger name="com.zaxxer.hikari" level="ERROR"/>
+    </springProfile>
+
+</configuration>
