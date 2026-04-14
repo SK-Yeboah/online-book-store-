@@ -4,6 +4,7 @@ import com.bookstore.entity.LoginAttempt;
 import com.bookstore.exception.AccountLockedException;
 import com.bookstore.exception.InvalidCredentialsException;
 import com.bookstore.repository.LoginAttemptRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ class AccountLockServiceTest {
     private static final String TEST_USER = "concurrentuser";
 
     @BeforeEach
+    @AfterEach
     void cleanUp() {
         loginAttemptRepository.findByUsername(TEST_USER)
                 .ifPresent(loginAttemptRepository::delete);
@@ -38,6 +40,12 @@ class AccountLockServiceTest {
     @Test
     @DisplayName("concurrent failures — account locks exactly at maxAttempts")
     void concurrentFailures_lockExactlyAtMaxAttempts() throws InterruptedException {
+        // Pre-create the row so all threads acquire a pessimistic write lock on the
+        // same existing row. Without this, all 10 threads race to INSERT the first row
+        // simultaneously; only 1 INSERT wins and the others get a DataIntegrityViolation
+        // that corrupts the EntityManager, leaving failedAttempts = 1 not 5.
+        loginAttemptRepository.save(new LoginAttempt(TEST_USER));
+
         int threads = 10;
         ExecutorService pool = Executors.newFixedThreadPool(threads);
         CountDownLatch latch = new CountDownLatch(1);

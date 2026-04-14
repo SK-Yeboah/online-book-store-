@@ -4,6 +4,7 @@ import com.bookstore.dto.request.LoginRequest;
 import com.bookstore.dto.request.RegisterRequest;
 import com.bookstore.dto.response.JwtResponse;
 import com.bookstore.exception.DuplicateResourceException;
+import com.bookstore.exception.InvalidCredentialsException;
 import com.bookstore.repository.RefreshTokenRepository;
 import com.bookstore.repository.UserRepository;
 import com.bookstore.security.Jwtutil;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -103,13 +103,15 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("login — throws BadCredentialsException on wrong password")
+    @DisplayName("login — throws InvalidCredentialsException on wrong password")
     void login_throwsBadCredentials_onWrongPassword() {
         userService.register(new RegisterRequest("badpwuser", "bp@test.com", "correctPass1"));
 
+        // AccountLockService catches BadCredentialsException and re-throws
+        // InvalidCredentialsException (which carries the remainingAttempts count)
         assertThatThrownBy(() ->
                 userService.login(new LoginRequest("badpwuser", "wrongPass")))
-                .isInstanceOf(BadCredentialsException.class);
+                .isInstanceOf(InvalidCredentialsException.class);
     }
 
     @Test
