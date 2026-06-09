@@ -1,15 +1,15 @@
 package com.bookstore.repository;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.bookstore.entity.RefreshToken;
-
-import io.lettuce.core.dynamic.annotation.Param;
-import jakarta.transaction.Transactional;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
 
@@ -31,8 +31,8 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     // Delete all expired tokens — called by scheduled cleanup
     @Modifying
     @Transactional
-    @Query("DELETE FROM RefreshToken rt WHERE rt.expiresAt < CURRENT_TIMESTAMP")
-    void deleteAllExpired();
+    @Query("DELETE FROM RefreshToken rt WHERE rt.expiresAt < :now")
+    void deleteAllExpired(@Param("now") Instant now);
 
 
 }

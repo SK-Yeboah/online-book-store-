@@ -171,7 +171,7 @@ class RefreshTokenServiceTest {
 
         refreshTokenService.cleanupExpiredTokens();
 
-        assertThat(refreshTokenRepository.findByToken("stale-token")).isEmpty();
+        assertThat(refreshTokenRepository.findByToken("stale-token")).isNotPresent();
         assertThat(refreshTokenRepository.findByToken(valid.getToken())).isPresent();
     }
 }

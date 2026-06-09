@@ -90,7 +90,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Scheduled(fixedRate = 3_600_000)
     @Transactional
     public void cleanupExpiredTokens(){
-        refreshTokenRepository.deleteAllExpired();
+        refreshTokenRepository.deleteAllExpired(Instant.now());
     }
 
 

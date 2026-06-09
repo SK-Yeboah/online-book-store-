@@ -33,8 +33,8 @@ class RateLimitFilterTest {
 
     @Autowired MockMvc mockMvc;
 
-    // Any public endpoint works as the probe — we use /actuator/health
-    private static final String PROBE = "/actuator/health";
+    // Public endpoint that returns 200 when the app is up (health may be 503 if a dependency is DOWN)
+    private static final String PROBE = "/api/books";
 
     // ── X-RateLimit-Remaining header is set on successful requests ────────────
 

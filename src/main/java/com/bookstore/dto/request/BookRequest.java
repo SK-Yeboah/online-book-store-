@@ -31,7 +31,7 @@ public class BookRequest {
 
     @NotNull(message = "Stock quantity is required")
     @Min(value = 0, message = "Stock cannot be negative")
-    private Integer stockQuantiy;
+    private Integer stockQuantity;
 
     private String description;
     
