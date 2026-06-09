@@ -16,7 +16,6 @@ import com.bookstore.service.BookService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
-import org.checkerframework.checker.tainting.qual.Tainted;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
