@@ -15,7 +15,6 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/online-book-store
   JAVA_VERSION: '17'
   AWS_REGION: us-east-1
 
@@ -142,23 +141,30 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Normalize image name
+        id: image
+        run: |
+          # GHCR/Docker tags must be lowercase (github.repository_owner may contain capitals).
+          echo "name=$(echo "${{ github.repository_owner }}/online-book-store" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Compute image tags
         id: vars
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          IMAGE_SHA="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${SHORT_SHA}"
+          IMAGE_BASE="${{ env.REGISTRY }}/${{ steps.image.outputs.name }}"
+          IMAGE_SHA="${IMAGE_BASE}:sha-${SHORT_SHA}"
           echo "image=${IMAGE_SHA}" >> "$GITHUB_OUTPUT"
           if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
-            echo "tags=${IMAGE_SHA},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> "$GITHUB_OUTPUT"
+            echo "tags=${IMAGE_SHA},${IMAGE_BASE}:latest" >> "$GITHUB_OUTPUT"
           else
-            echo "tags=${IMAGE_SHA},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging-latest" >> "$GITHUB_OUTPUT"
+            echo "tags=${IMAGE_SHA},${IMAGE_BASE}:staging-latest" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Extract image metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
