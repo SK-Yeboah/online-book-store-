@@ -21,6 +21,7 @@ public class ResourceNotFoundException extends BookstoreException {
             case "user"  -> ErrorCode.USER_NOT_FOUND;
             case "book"  -> ErrorCode.BOOK_NOT_FOUND;
             case "cart"  -> ErrorCode.CART_NOT_FOUND;
+            case "cartitem", "cart item", "cart_item" -> ErrorCode.CART_ITEM_NOT_FOUND;
             case "order" -> ErrorCode.ORDER_NOT_FOUND;
             default      -> ErrorCode.BAD_REQUEST;
         };
