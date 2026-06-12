@@ -28,8 +28,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import org.aspectj.lang.annotation.After;
-
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -118,7 +116,7 @@ class GlobalSecurityExceptionHandlerTest {
                         .content(Objects.requireNonNull(badLogin)))
                 .andExpect(status().isLocked())
                 .andExpect(jsonPath("$.error").value("Account Locked"))
-                .andExpect(jsonPath("$.message").value(containsString("minutes")));
+                .andExpect(jsonPath("$.message").value(Objects.requireNonNull(containsString("minutes"))));
     }
 
     // ── 400 Missing Request Parameter ─────────────────────────────────────────
@@ -130,7 +128,7 @@ class GlobalSecurityExceptionHandlerTest {
         mockMvc.perform(post("/api/auth/refresh"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message").value(containsString("refreshToken")));
+                .andExpect(jsonPath("$.message").value(Objects.requireNonNull(containsString("refreshToken"))));
     }
 
     // ── 403 Access Denied (AccessDeniedException) ─────────────────────────────
@@ -145,6 +143,6 @@ class GlobalSecurityExceptionHandlerTest {
                 .andExpect(jsonPath("$.error").value("FORBIDDEN"))
                 // This assertion catches the Bug 1 regression: path must be the real URI
                 .andExpect(jsonPath("$.path").value("/api/admin/users"))
-                .andExpect(jsonPath("$.path").value(not("request.getRequestURI()")));
+                .andExpect(jsonPath("$.path").value(Objects.requireNonNull(not("request.getRequestURI()"))));
     }
 }

@@ -119,8 +119,7 @@ public class BookServiceImpl  implements BookService{
     @Override
     @Transactional
     public void delete(Long id) {
-       Book book = getOrThrow(id);
-       bookRepository.delete(book);
+       bookRepository.delete(Objects.requireNonNull(getOrThrow(id)));
        log.info("Book deleted: id={} ", id);
     }
 
@@ -128,8 +127,8 @@ public class BookServiceImpl  implements BookService{
     private Book getOrThrow(Long id) {
         Long bookId = Objects.requireNonNull(id, "Book id must not be null");
     
-        return bookRepository.findById(bookId)
-                .orElseThrow(() -> new ResourceNotFoundException("Book", "id", bookId));
+        return Objects.requireNonNull(bookRepository.findById(bookId)
+                .orElseThrow(() -> new ResourceNotFoundException("Book", "id", bookId)));
     }
 
 
