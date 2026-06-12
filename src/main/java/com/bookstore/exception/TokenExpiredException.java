@@ -4,7 +4,6 @@ package com.bookstore.exception;
 // package com.bookstore.exception.auth;
 
 import org.springframework.http.HttpStatus;
-import com.bookstore.exception.BookstoreException;
 import com.bookstore.exception.handler.ErrorCode;
 
 public class TokenExpiredException extends BookstoreException {

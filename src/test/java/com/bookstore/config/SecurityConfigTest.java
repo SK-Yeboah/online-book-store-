@@ -1,9 +1,14 @@
 package com.bookstore.config;
 
 import com.bookstore.dto.request.RegisterRequest;
+import com.bookstore.repository.CartItemRepository;
+import com.bookstore.repository.CartRepository;
 import com.bookstore.repository.RefreshTokenRepository;
 import com.bookstore.repository.UserRepository;
+import com.bookstore.support.TestDatabaseCleaner;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +25,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Objects;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -30,11 +37,14 @@ class SecurityConfigTest {
     @Autowired ObjectMapper objectMapper;
     @Autowired UserRepository userRepository;
     @Autowired RefreshTokenRepository refreshTokenRepository;
+    @Autowired CartItemRepository cartItemRepository;
+    @Autowired CartRepository cartRepository;
+    @Autowired TestDatabaseCleaner dbCleaner;
 
     @BeforeEach
+    @AfterEach
     void cleanUp() {
-        refreshTokenRepository.deleteAll();
-        userRepository.deleteAll();
+        dbCleaner.resetUserRelatedTables();
     }
 
     // ── Public endpoints — no credentials required ─────────────────────────────
@@ -45,10 +55,10 @@ class SecurityConfigTest {
         String body = objectMapper.writeValueAsString(
                 new RegisterRequest("publictest", "pub@test.com", "password123"));
 
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isCreated());
+                mockMvc.perform(post("/api/auth/register")
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(body)))
+        .andExpect(status().isCreated());
     }
 
     @Test

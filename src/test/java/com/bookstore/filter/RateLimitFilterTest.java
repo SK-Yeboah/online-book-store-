@@ -9,6 +9,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Objects;
+
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -126,7 +130,6 @@ class RateLimitFilterTest {
         // Note: 127.0.0.1 bucket may already be partially drained by other tests,
         // so we just assert the filter is running (response is not a 5xx).
         mockMvc.perform(get(PROBE))
-                .andExpect(status().is(org.hamcrest.Matchers.not(
-                        org.hamcrest.Matchers.greaterThanOrEqualTo(500))));
+                .andExpect(status().is(Objects.requireNonNull(not(greaterThanOrEqualTo(500)))));
     }
 }

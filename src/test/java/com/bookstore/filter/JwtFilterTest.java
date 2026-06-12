@@ -3,9 +3,12 @@ package com.bookstore.filter;
 import com.bookstore.dto.request.LoginRequest;
 import com.bookstore.dto.request.RegisterRequest;
 import com.bookstore.dto.response.JwtResponse;
+import com.bookstore.repository.CartItemRepository;
+import com.bookstore.repository.CartRepository;
 import com.bookstore.repository.RefreshTokenRepository;
 import com.bookstore.repository.UserRepository;
 import com.bookstore.service.UserService;
+import com.bookstore.support.TestDatabaseCleaner;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,7 +17,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.Objects;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -30,11 +36,13 @@ class JwtFilterTest {
     @Autowired UserRepository userRepository;
     @Autowired RefreshTokenRepository refreshTokenRepository;
     @Autowired ObjectMapper objectMapper;
+    @Autowired CartItemRepository cartItemRepository;
+    @Autowired CartRepository cartRepository;
+    @Autowired TestDatabaseCleaner dbCleaner;
 
     @BeforeEach
     void setUp() {
-        refreshTokenRepository.deleteAll();
-        userRepository.deleteAll();
+        dbCleaner.resetUserRelatedTables();
         userService.register(new RegisterRequest("jwtfilteruser", "jf@test.com", "password123"));
     }
 
@@ -52,8 +60,8 @@ class JwtFilterTest {
                 new RegisterRequest("noheaderuser", "nh@test.com", "password123"));
 
         mockMvc.perform(post("/api/auth/register")
-                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                        .content(body))
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(body)))
                 .andExpect(status().isCreated());
     }
 

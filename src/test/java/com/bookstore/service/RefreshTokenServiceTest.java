@@ -4,8 +4,12 @@ import com.bookstore.entity.RefreshToken;
 import com.bookstore.entity.User;
 import com.bookstore.exception.InvalidTokenException;
 import com.bookstore.exception.TokenExpiredException;
+import com.bookstore.repository.CartItemRepository;
+import com.bookstore.repository.CartRepository;
 import com.bookstore.repository.RefreshTokenRepository;
 import com.bookstore.repository.UserRepository;
+import com.bookstore.support.TestDatabaseCleaner;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,13 +31,15 @@ class RefreshTokenServiceTest {
     @Autowired RefreshTokenRepository refreshTokenRepository;
     @Autowired UserRepository userRepository;
     @Autowired PasswordEncoder passwordEncoder;
+    @Autowired CartItemRepository cartItemRepository;
+    @Autowired CartRepository cartRepository;
+    @Autowired TestDatabaseCleaner dbCleaner;
 
     private User testUser;
 
     @BeforeEach
     void setUp() {
-        refreshTokenRepository.deleteAll();
-        userRepository.deleteAll();
+        dbCleaner.resetUserRelatedTables();
         testUser = userRepository.save(
                 new User("rftestuser", passwordEncoder.encode("pass"), "rf@test.com", User.Role.ROLE_USER));
     }

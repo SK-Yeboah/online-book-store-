@@ -5,9 +5,13 @@ import com.bookstore.dto.request.RegisterRequest;
 import com.bookstore.dto.response.JwtResponse;
 import com.bookstore.exception.DuplicateResourceException;
 import com.bookstore.exception.InvalidCredentialsException;
+import com.bookstore.repository.CartItemRepository;
+import com.bookstore.repository.CartRepository;
 import com.bookstore.repository.RefreshTokenRepository;
 import com.bookstore.repository.UserRepository;
 import com.bookstore.security.Jwtutil;
+import com.bookstore.support.TestDatabaseCleaner;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,11 +32,13 @@ class UserServiceTest {
     @Autowired RefreshTokenRepository refreshTokenRepository;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired Jwtutil jwtutil;
+    @Autowired CartItemRepository cartItemRepository;
+    @Autowired CartRepository cartRepository;
+    @Autowired TestDatabaseCleaner dbCleaner;
 
     @BeforeEach
     void cleanUp() {
-        refreshTokenRepository.deleteAll();
-        userRepository.deleteAll();
+        dbCleaner.resetUserRelatedTables();
     }
 
     // ── register ───────────────────────────────────────────────────────────────

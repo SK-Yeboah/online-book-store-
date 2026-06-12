@@ -5,7 +5,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
-// import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -19,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @ControllerAdvice
@@ -49,8 +49,8 @@ public ResponseEntity<Map<String, Object>> handleBookStoreException(
         BookstoreException ex,
         HttpServletRequest request) {
     log.warn("BookstoreException [{}] at {}: {}", ex.getErrorCode(), request.getRequestURI(), ex.getMessage());
-
-    return ResponseEntity.status(ex.getStatus())
+    HttpStatus status = Objects.requireNonNull(ex.getStatus());
+    return ResponseEntity.status(status)
             .body(Map.of(
                     "status", ex.getStatus().value(),
                     "error", ex.getErrorCode(),
@@ -144,9 +144,10 @@ public ResponseEntity<?> handleDisabled(
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<?> handleTypeMismatch(
             MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
- 
-        String message = "Parameter '" + ex.getName() + "' should be of type "
-                + (ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown");
+        
+        Class<?> requiredType  = ex.getRequiredType();
+        String typeName = requiredType != null ? requiredType.getSimpleName() : "Unknown";
+        String message = "Paremeter '" + ex.getName()  + "' should be  of type " + typeName;
  
         return ResponseEntity
                 .badRequest()

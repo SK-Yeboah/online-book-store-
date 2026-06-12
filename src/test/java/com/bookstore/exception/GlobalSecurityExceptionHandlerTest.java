@@ -2,9 +2,14 @@ package com.bookstore.exception;
 
 import com.bookstore.dto.request.LoginRequest;
 import com.bookstore.dto.request.RegisterRequest;
+import com.bookstore.repository.CartItemRepository;
+import com.bookstore.repository.CartRepository;
 import com.bookstore.repository.RefreshTokenRepository;
 import com.bookstore.repository.UserRepository;
+import com.bookstore.support.TestDatabaseCleaner;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,10 +21,14 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Objects;
+
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import org.aspectj.lang.annotation.After;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -31,11 +40,14 @@ class GlobalSecurityExceptionHandlerTest {
     @Autowired ObjectMapper objectMapper;
     @Autowired UserRepository userRepository;
     @Autowired RefreshTokenRepository refreshTokenRepository;
+    @Autowired CartItemRepository cartItemRepository;
+    @Autowired CartRepository cartRepository;
+    @Autowired TestDatabaseCleaner dbCleaner;
 
     @BeforeEach
+    @AfterEach
     void cleanUp() {
-        refreshTokenRepository.deleteAll();
-        userRepository.deleteAll();
+       dbCleaner.resetUserRelatedTables();
     }
 
     // ── 400 Validation (MethodArgumentNotValidException) ─────────────────────
@@ -47,8 +59,8 @@ class GlobalSecurityExceptionHandlerTest {
                 new RegisterRequest("", "bad-email", ""));
 
         mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(body)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"))
@@ -63,17 +75,17 @@ class GlobalSecurityExceptionHandlerTest {
     void invalidCredentials_returns401WithRemainingAttempts() throws Exception {
         // Register so the user exists
         mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new RegisterRequest("exhandleruser", "ex@test.com", "correct123"))))
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(objectMapper.writeValueAsString(
+                                new RegisterRequest("exhandleruser", "ex@test.com", "correct123")))))
                 .andExpect(status().isCreated());
 
         String badLogin = objectMapper.writeValueAsString(
                 new LoginRequest("exhandleruser", "wrongpassword"));
 
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(badLogin))
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(badLogin)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("Invalid Credentials"))
                 .andExpect(jsonPath("$.remainingAttempts").isNumber());
@@ -85,9 +97,9 @@ class GlobalSecurityExceptionHandlerTest {
     @DisplayName("POST /api/auth/login after 5 failures → 423 with minutesRemaining")
     void accountLocked_returns423() throws Exception {
         mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new RegisterRequest("lockcandidate", "lock@test.com", "correct123"))))
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(objectMapper.writeValueAsString(
+                                new RegisterRequest("lockcandidate", "lock@test.com", "correct123")))))
                 .andExpect(status().isCreated());
 
         String badLogin = objectMapper.writeValueAsString(
@@ -96,14 +108,14 @@ class GlobalSecurityExceptionHandlerTest {
         // Exhaust the 5 allowed attempts
         for (int i = 0; i < 5; i++) {
             mockMvc.perform(post("/api/auth/login")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(badLogin));
+                            .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                            .content(Objects.requireNonNull(badLogin)));
         }
 
         // 6th attempt — account should now be locked
         mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(badLogin))
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(badLogin)))
                 .andExpect(status().isLocked())
                 .andExpect(jsonPath("$.error").value("Account Locked"))
                 .andExpect(jsonPath("$.message").value(containsString("minutes")));

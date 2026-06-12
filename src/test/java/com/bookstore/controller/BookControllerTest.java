@@ -15,6 +15,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Objects;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -100,8 +102,8 @@ class BookControllerTest {
     @WithMockUser(roles = "ADMIN")
     void create_admin_returns201() throws Exception {
         mockMvc.perform(post("/api/admin/books")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(validBook)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(validBook))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.inStock").value(true));
@@ -111,8 +113,8 @@ class BookControllerTest {
     @DisplayName("POST /api/admin/books — 401 without auth")
     void create_noAuth_returns401() throws Exception {
         mockMvc.perform(post("/api/admin/books")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(validBook)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(validBook))))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -121,8 +123,8 @@ class BookControllerTest {
     @WithMockUser(roles = "USER")
     void create_user_returns403() throws Exception {
         mockMvc.perform(post("/api/admin/books")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(validBook)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(validBook))))
                 .andExpect(status().isForbidden());
     }
 
@@ -136,8 +138,8 @@ class BookControllerTest {
                 "978-0132350884", 10.0, 5, null);
 
         mockMvc.perform(post("/api/admin/books")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(dup)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(dup))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("DUPLICATE_ISBN"));
     }
@@ -150,8 +152,8 @@ class BookControllerTest {
         validBook.setTitle("Clean Code — Updated");
 
         mockMvc.perform(put("/api/admin/books/{id}", id)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(validBook)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(validBook))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Clean Code — Updated"));
     }
@@ -163,8 +165,8 @@ class BookControllerTest {
         Long id = extractId(createBook(validBook));
 
         mockMvc.perform(patch("/api/admin/books/{id}/stock", id)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new UpdateStockRequest(0))))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(new UpdateStockRequest(0)))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.stockQuantity").value(0))
                 .andExpect(jsonPath("$.inStock").value(false));
@@ -185,8 +187,8 @@ class BookControllerTest {
 
     private String createBook(BookRequest req) throws Exception {
         return mockMvc.perform(post("/api/admin/books")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(req)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(req))))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()

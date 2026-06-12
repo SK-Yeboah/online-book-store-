@@ -15,10 +15,12 @@ import org.springframework.util.StringUtils;
 import com.bookstore.dto.request.LoginRequest;
 import com.bookstore.dto.request.RegisterRequest;
 import com.bookstore.dto.response.JwtResponse;
+import com.bookstore.entity.Cart;
 import com.bookstore.entity.RefreshToken;
 import com.bookstore.entity.User;
 import com.bookstore.exception.DuplicateResourceException;
 import com.bookstore.exception.ResourceNotFoundException;
+import com.bookstore.repository.CartRepository;
 import com.bookstore.repository.UserRepository;
 import com.bookstore.security.Jwtutil;
 import com.bookstore.security.TokenBlacklist;
@@ -35,13 +37,14 @@ public class UserService {
     private final UserRepository userRepository;;
     private final AuthenticationManager authenticationManager;
     private final PasswordEncoder passwordEncoder;
-    // private final CartRepository cartRepository;
+    private final CartRepository cartRepository;
     private final UserDetailsService userDetailsService;
     private final Jwtutil jwtutil;
     // private final RefreshToken refreshToken;
     private final AccountLockService accountLockService;
     private final TokenBlacklist tokenBlacklist;
     private final RefreshTokenService refreshTokenService;
+
 
 
     //Register
@@ -62,6 +65,7 @@ public class UserService {
        try{
             User user = new User(username, passwordEncoder.encode(registerRequest.getPassword()), email, User.Role.ROLE_USER);
             User savedUser = userRepository.saveAndFlush(user);
+            cartRepository.save(new Cart(savedUser));
             
             log.info("New user registered successfully: {}", username);
             return "User registered successfully";
