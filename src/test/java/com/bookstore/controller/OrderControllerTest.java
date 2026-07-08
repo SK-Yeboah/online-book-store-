@@ -143,8 +143,9 @@ class OrderControllerTest {
 
         mockMvc.perform(get("/api/orders"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].orderId").isNumber())
-                .andExpect(jsonPath("$[0].status").value("CONFIRMED"));
+                .andExpect(jsonPath("$.content[0].orderId").isNumber())
+                .andExpect(jsonPath("$.content[0].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     private void registerUser(String username, String email) throws Exception {

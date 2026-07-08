@@ -29,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
+    "security.rate-limiting.enabled=true",
     "security.rate-limiting.capacity=3",
     "security.rate-limiting.refill-per-minute=3"
 })

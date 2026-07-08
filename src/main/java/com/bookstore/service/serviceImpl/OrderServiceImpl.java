@@ -99,10 +99,10 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderResponse> findByUser(Long userId) {
-        return orderRepository.findByUser_IdOrderByCreatedAtDesc(userId).stream()
-                .map(this::toOrderResponse)
-                .toList();
+    public PagedResponse<OrderResponse> findByUser(Long userId, Pageable pageable) {
+        Page<OrderResponse> page = orderRepository.findByUser_IdOrderByCreatedAtDesc(userId, pageable)
+                .map(this::toOrderResponse);
+        return PagedResponse.of(page);
     }
 
     @Override

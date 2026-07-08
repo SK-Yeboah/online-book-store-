@@ -1,7 +1,8 @@
 package com.bookstore.controller;
 
-import java.util.List;
-
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -10,9 +11,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bookstore.dto.response.OrderResponse;
+import com.bookstore.dto.response.PagedResponse;
 import com.bookstore.exception.ResourceNotFoundException;
 import com.bookstore.repository.UserRepository;
 import com.bookstore.service.OrderService;
@@ -37,10 +40,14 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "List my orders")
+    @Operation(summary = "List my orders", description = "Paginated, newest first.")
     @GetMapping
-    public ResponseEntity<List<OrderResponse>> listOrders(@AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(orderService.findByUser(resolveUserId(userDetails)));
+    public ResponseEntity<PagedResponse<OrderResponse>> listOrders(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        return ResponseEntity.ok(orderService.findByUser(resolveUserId(userDetails), pageable));
     }
 
     @Operation(summary = "Get order by id")

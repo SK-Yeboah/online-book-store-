@@ -1,6 +1,5 @@
 package com.bookstore.repository;
 
-import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -11,7 +10,7 @@ import com.bookstore.entity.Order;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
-    List<Order> findByUser_IdOrderByCreatedAtDesc(Long userId);
+    Page<Order> findByUser_IdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
     Optional<Order> findByIdAndUser_Id(Long id, Long userId);
 
