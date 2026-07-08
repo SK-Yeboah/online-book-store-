@@ -26,7 +26,7 @@ public class Order extends BaseEntity {
     public Order(User user, Double totalAmount){
         this.user = user;
         this.totalAmount = totalAmount;
-
+        this.status = OrderStatus.CONFIRMED;
     }
 
 
