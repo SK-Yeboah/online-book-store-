@@ -3,17 +3,24 @@ package com.bookstore.service.serviceImpl;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.bookstore.dto.request.UpdateOrderStatusRequest;
 import com.bookstore.dto.response.OrderResponse;
+import com.bookstore.dto.response.PagedResponse;
 import com.bookstore.entity.Book;
 import com.bookstore.entity.Cart;
 import com.bookstore.entity.CartItem;
 import com.bookstore.entity.Order;
+import com.bookstore.entity.Order.OrderStatus;
 import com.bookstore.entity.OrderItem;
 import com.bookstore.exception.BookstoreException;
 import com.bookstore.exception.ResourceNotFoundException;
@@ -32,6 +39,11 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
+
+    private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED_TRANSITIONS = Map.of(
+            OrderStatus.PENDING, Set.of(OrderStatus.CONFIRMED, OrderStatus.CANCELLED),
+            OrderStatus.CONFIRMED, Set.of(OrderStatus.SHIPPED, OrderStatus.CANCELLED),
+            OrderStatus.SHIPPED, Set.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED));
 
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
@@ -102,6 +114,49 @@ public class OrderServiceImpl implements OrderService {
         return toOrderResponse(order);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PagedResponse<OrderResponse> findAll(Pageable pageable) {
+        Page<OrderResponse> page = orderRepository.findAllByOrderByCreatedAtDesc(pageable)
+                .map(this::toOrderResponse);
+        return PagedResponse.of(page);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse updateStatus(Long orderId, UpdateOrderStatusRequest request) {
+        Long id = Objects.requireNonNull(orderId, "Order id must not be null");
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("order", "id", id));
+
+        OrderStatus current = order.getStatus();
+        OrderStatus target = request.getStatus();
+
+        if (current == OrderStatus.CANCELLED) {
+            throw new BookstoreException(
+                    ErrorCode.ORDER_ALREADY_CANCELLED.name(),
+                    "Order is already cancelled",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        if (current == OrderStatus.DELIVERED) {
+            throw invalidTransitionException(current, target);
+        }
+
+        Set<OrderStatus> allowed = ALLOWED_TRANSITIONS.get(current);
+        if (allowed == null || !allowed.contains(target)) {
+            throw invalidTransitionException(current, target);
+        }
+
+        if (target == OrderStatus.CANCELLED) {
+            restoreStock(id);
+        }
+
+        order.setStatus(target);
+        log.info("Order status updated: orderId={}, {} -> {}", id, current, target);
+        return toOrderResponse(order);
+    }
+
     private OrderResponse toOrderResponse(Order order) {
         List<OrderItem> items = orderItemRepository.findByOrderIdWithBooks(order.getId());
         return OrderResponse.from(order, items);
@@ -120,6 +175,27 @@ public class OrderServiceImpl implements OrderService {
         return new BookstoreException(
                 ErrorCode.EMPTY_CART.name(),
                 "Cart is empty",
+                HttpStatus.BAD_REQUEST);
+    }
+
+    private void restoreStock(Long orderId) {
+        List<OrderItem> items = orderItemRepository.findByOrderIdWithBooks(orderId);
+        List<OrderItem> sorted = items.stream()
+                .sorted(Comparator.comparing(item -> item.getBook().getId()))
+                .toList();
+
+        for (OrderItem item : sorted) {
+            Long bookId = item.getBook().getId();
+            Book book = bookRepository.findByIdForUpdate(bookId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Book", "id", bookId));
+            book.setStockQuantity(book.getStockQuantity() + item.getQuantity());
+        }
+    }
+
+    private BookstoreException invalidTransitionException(OrderStatus from, OrderStatus to) {
+        return new BookstoreException(
+                ErrorCode.INVALID_ORDER_STATUS_TRANSITION.name(),
+                "Cannot transition order from " + from + " to " + to,
                 HttpStatus.BAD_REQUEST);
     }
 
