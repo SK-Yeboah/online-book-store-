@@ -86,6 +86,7 @@ public class SecurityConfig {
                     "/v3/api-docs", "/v3/api-docs/**"
                 ).permitAll()
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/payments/webhook/**").permitAll()
                 .anyRequest()
                 .authenticated()
             )
@@ -120,6 +121,7 @@ public class SecurityConfig {
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
         config.setExposedHeaders(List.of("Authorization"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Idempotency-key", "X-Paystack-Signature", "X-Webhook-Secret"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 

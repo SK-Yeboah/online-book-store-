@@ -35,6 +35,7 @@ public enum ErrorCode {
     CART_NOT_FOUND,
     CART_ITEM_NOT_FOUND,
     ORDER_NOT_FOUND,
+    PAYMENT_NOT_FOUND,
 
     // ── Duplicate ─────────────────────────────────────────────────
     DUPLICATE_USERNAME,
@@ -56,5 +57,11 @@ public enum ErrorCode {
 
     // ── General ───────────────────────────────────────────────────
     INTERNAL_ERROR,
-    BAD_REQUEST
+    BAD_REQUEST,
+
+    // ----- Payment Codes ------------
+    ORDER_NOT_PAYABLE,
+    INVALID_PAYMENT_STATE,
+    PAYMENT_ALREADY_SUCCEEDED,
+    PAYMENT_WEBHOOK_INVALID,
 }

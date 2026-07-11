@@ -23,8 +23,10 @@ import com.bookstore.dto.request.AddToCartRequest;
 import com.bookstore.dto.request.RegisterRequest;
 import com.bookstore.dto.request.UpdateOrderStatusRequest;
 import com.bookstore.entity.Book;
+import com.bookstore.entity.Order;
 import com.bookstore.entity.Order.OrderStatus;
 import com.bookstore.repository.BookRepository;
+import com.bookstore.repository.OrderRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.transaction.Transactional;
@@ -41,6 +43,7 @@ class AdminOrderControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @Autowired BookRepository bookRepository;
+    @Autowired OrderRepository orderRepository;
 
     private Long bookId;
     private Long orderId;
@@ -69,6 +72,8 @@ class AdminOrderControllerTest {
     @DisplayName("PATCH /api/admin/orders/{id}/status — CONFIRMED to SHIPPED")
     @WithMockUser(roles = "ADMIN")
     void updateStatus_confirmedToShipped_returns200() throws Exception {
+        markConfirmed(orderId);
+
         mockMvc.perform(patch("/api/admin/orders/{id}/status", orderId)
                         .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .content(Objects.requireNonNull(objectMapper.writeValueAsString(
@@ -81,6 +86,7 @@ class AdminOrderControllerTest {
     @DisplayName("PATCH /api/admin/orders/{id}/status — SHIPPED to DELIVERED")
     @WithMockUser(roles = "ADMIN")
     void updateStatus_shippedToDelivered_returns200() throws Exception {
+        markConfirmed(orderId);
         updateStatusAsAdmin(orderId, OrderStatus.SHIPPED);
 
         mockMvc.perform(patch("/api/admin/orders/{id}/status", orderId)
@@ -95,6 +101,8 @@ class AdminOrderControllerTest {
     @DisplayName("PATCH /api/admin/orders/{id}/status — 400 invalid skip to DELIVERED")
     @WithMockUser(roles = "ADMIN")
     void updateStatus_confirmedToDelivered_returns400() throws Exception {
+        markConfirmed(orderId);
+
         mockMvc.perform(patch("/api/admin/orders/{id}/status", orderId)
                         .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .content(Objects.requireNonNull(objectMapper.writeValueAsString(
@@ -168,6 +176,12 @@ class AdminOrderControllerTest {
                 .andReturn().getResponse().getContentAsString();
 
         return objectMapper.readTree(json).get("orderId").asLong();
+    }
+
+    private void markConfirmed(Long id) {
+        Order order = orderRepository.findById(id).orElseThrow();
+        order.setStatus(OrderStatus.CONFIRMED);
+        orderRepository.saveAndFlush(order);
     }
 
     private void updateStatusAsAdmin(Long id, OrderStatus status) throws Exception {

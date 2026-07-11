@@ -12,4 +12,6 @@ public interface OrderService {
     OrderResponse findById(Long userId, Long orderId);
     PagedResponse<OrderResponse> findAll(Pageable pageable);
     OrderResponse updateStatus(Long orderId, UpdateOrderStatusRequest request);
+    void markPaid(Long orderId);
+    void markPaymentFailed(Long orderId);
 }

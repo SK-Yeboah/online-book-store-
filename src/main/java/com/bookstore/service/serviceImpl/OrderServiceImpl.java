@@ -42,6 +42,8 @@ public class OrderServiceImpl implements OrderService {
 
     private static final Map<OrderStatus, Set<OrderStatus>> ALLOWED_TRANSITIONS = Map.of(
             OrderStatus.PENDING, Set.of(OrderStatus.CONFIRMED, OrderStatus.CANCELLED),
+            OrderStatus.PENDING_PAYMENT, Set.of(OrderStatus.CANCELLED),
+            OrderStatus.PAYMENT_FAILED, Set.of(OrderStatus.CANCELLED),
             OrderStatus.CONFIRMED, Set.of(OrderStatus.SHIPPED, OrderStatus.CANCELLED),
             OrderStatus.SHIPPED, Set.of(OrderStatus.DELIVERED, OrderStatus.CANCELLED));
 
@@ -156,6 +158,37 @@ public class OrderServiceImpl implements OrderService {
         log.info("Order status updated: orderId={}, {} -> {}", id, current, target);
         return toOrderResponse(order);
     }
+
+    @Override
+    @Transactional
+    public void markPaid(Long orderId){
+        Long id  = Objects.requireNonNull(orderId, "Order id must not be null");
+        Order order = orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
+
+        if(order.getStatus() != Order.OrderStatus.PENDING_PAYMENT) {
+            throw new BookstoreException(ErrorCode.ORDER_NOT_PAYABLE.name(), "Order is not awaiting payment", HttpStatus.BAD_REQUEST);
+        }
+
+        order.setStatus(OrderStatus.CONFIRMED);
+        log.info("Order marked paid: orderId={}", id);
+    }
+
+
+    @Override
+    @Transactional
+    public void markPaymentFailed(Long orderId){
+        Long id = Objects.requireNonNull(orderId, "Order is must not be null");
+        Order order = orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("order", "id", id));
+        
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT){
+            throw new BookstoreException(ErrorCode.ORDER_NOT_PAYABLE.name(), "Order is not awaiting payment", HttpStatus.BAD_REQUEST);
+        }
+        
+        restoreStock(id);
+        order.setStatus(OrderStatus.PAYMENT_FAILED);
+        log.info("Order Payment failed: orderId={}", id);
+    }
+    
 
     private OrderResponse toOrderResponse(Order order) {
         List<OrderItem> items = orderItemRepository.findByOrderIdWithBooks(order.getId());

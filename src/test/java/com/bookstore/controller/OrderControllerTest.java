@@ -90,7 +90,7 @@ class OrderControllerTest {
         mockMvc.perform(post("/api/orders/checkout"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.orderId").isNumber())
-                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.status").value("PENDING_PAYMENT"))
                 .andExpect(jsonPath("$.totalAmount").value(39.98))
                 .andExpect(jsonPath("$.items[0].quantity").value(2))
                 .andExpect(jsonPath("$.items[0].priceAtPurchase").value(19.99));
@@ -144,7 +144,7 @@ class OrderControllerTest {
         mockMvc.perform(get("/api/orders"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].orderId").isNumber())
-                .andExpect(jsonPath("$.content[0].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.content[0].status").value("PENDING_PAYMENT"))
                 .andExpect(jsonPath("$.totalElements").value(1));
     }
 
