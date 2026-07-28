@@ -57,6 +57,13 @@ services:
       PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY}
       PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY}
       PAYMENT_CALLBACK_URL: ${PAYMENT_CALLBACK_URL:-http://localhost:3000/payment/callback}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
+      PAYMENT_CURRENCY: ${PAYMENT_CURRENCY:-GHS}
+      PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-dev-webhook-secret}
+      SECURITY_RATE_LIMIT_CAPACITY: ${SECURITY_RATE_LIMIT_CAPACITY:-60}
+      SECURITY_RATE_LIMIT_REFILL_PER_MINUTE: ${SECURITY_RATE_LIMIT_REFILL_PER_MINUTE:-60}
+      ACTUATOR_PROMETHEUS_PUBLIC: ${ACTUATOR_PROMETHEUS_PUBLIC:-true}
+      SECURITY_SWAGGER_PUBLIC: ${SECURITY_SWAGGER_PUBLIC:-true}
     ports:
       - "${SERVER_PORT:-8080}:8080"
     healthcheck:
@@ -66,5 +73,46 @@ services:
       start_period: 60s
       retries: 3
 
+  # ── Prometheus ─────────────────────────────────────────────────────────────
+  # Scrapes Spring Actuator metrics at /actuator/prometheus
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: bookstore-prometheus
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+
+  # ── Grafana ────────────────────────────────────────────────────────────────
+  # Pre-provisioned Prometheus datasource + Bookstore Overview dashboard
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: bookstore-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/bookstore.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+
 volumes:
   mysql_data:
+  prometheus_data:
+  grafana_data:

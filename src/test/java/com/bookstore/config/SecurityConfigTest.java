@@ -68,6 +68,14 @@ class SecurityConfigTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    @DisplayName("GET /actuator/prometheus is not blocked by auth when prometheus-public=true")
+    void actuatorPrometheus_notUnauthorizedWhenPublic() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(result ->
+                        assertThat(result.getResponse().getStatus()).isNotEqualTo(401));
+    }
+
     // ── Protected endpoints — unauthenticated → 401 ───────────────────────────
 
     @Test

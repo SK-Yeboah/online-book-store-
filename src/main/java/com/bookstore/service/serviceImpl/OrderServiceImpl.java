@@ -25,6 +25,7 @@ import com.bookstore.entity.OrderItem;
 import com.bookstore.exception.BookstoreException;
 import com.bookstore.exception.ResourceNotFoundException;
 import com.bookstore.exception.handler.ErrorCode;
+import com.bookstore.metrics.BookstoreMetrics;
 import com.bookstore.repository.BookRepository;
 import com.bookstore.repository.CartItemRepository;
 import com.bookstore.repository.CartRepository;
@@ -52,6 +53,7 @@ public class OrderServiceImpl implements OrderService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final BookRepository bookRepository;
+    private final BookstoreMetrics bookstoreMetrics;
 
     @Override
     @Transactional
@@ -94,6 +96,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         cartItemRepository.deleteByCart_Id(cart.getId());
+        bookstoreMetrics.checkoutCompleted();
         log.info("Checkout complete: orderId={}, userId={}, total={}", order.getId(), id, totalAmount);
 
         return toOrderResponse(order);

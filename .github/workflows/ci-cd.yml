@@ -17,8 +17,8 @@ env:
   REGISTRY: ghcr.io
   JAVA_VERSION: '17'
   AWS_REGION: us-east-1
-  # AWS deploy jobs are disabled until secrets and ECS vars are configured.
-  # To enable: set DEPLOY_TO_AWS to 'true' and update deploy job `if` conditions.
+  # AWS deploy jobs stay disabled until staging gate + secrets are ready.
+  # See docs/production-checklist.md. Set DEPLOY_TO_AWS to 'true' only after that.
   DEPLOY_TO_AWS: 'false'
 
 jobs:

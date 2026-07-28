@@ -29,6 +29,7 @@ import com.bookstore.entity.Payment.PaymentStatus;
 import com.bookstore.exception.BookstoreException;
 import com.bookstore.exception.ResourceNotFoundException;
 import com.bookstore.exception.handler.ErrorCode;
+import com.bookstore.metrics.BookstoreMetrics;
 import com.bookstore.payment.PaymentProvider;
 import com.bookstore.payment.PaymentProviderRegistry;
 import com.bookstore.payment.ProviderIntentRequest;
@@ -63,6 +64,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentProviderRegistry providerRegistry;
     private final PaymentProperties paymentProperties;
     private final OrderService orderService;
+    private final BookstoreMetrics bookstoreMetrics;
 
     @Override
     @Transactional
@@ -118,6 +120,7 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setAccessCode(result.accessCode());
         payment.setStatus(PaymentStatus.REQUIRES_ACTION);
 
+        bookstoreMetrics.paymentIntentCreated(provider.name());
         log.info("Payment intent created: paymentId={}, orderId={}, provider={}",
                 payment.getId(), order.getId(), provider.name());
 
@@ -166,6 +169,7 @@ public class PaymentServiceImpl implements PaymentService {
             applyFailure(payment, command.providerPaymentId());
         }
 
+        bookstoreMetrics.paymentWebhook(provider.name(), command.success());
         log.info("Payment webhook processed: paymentId={}, provider={}, success={}",
                 payment.getId(), provider.name(), command.success());
 
@@ -240,6 +244,7 @@ public class PaymentServiceImpl implements PaymentService {
         for (Order candidate : stale) {
             try {
                 if (expireOne(candidate.getId())) {
+                    bookstoreMetrics.unpaidOrderExpired();
                     processed++;
                 }
             } catch (Exception ex) {
@@ -308,6 +313,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         payment.setStatus(PaymentStatus.REFUNDED);
         orderService.updateStatus(order.getId(), new UpdateOrderStatusRequest(OrderStatus.CANCELLED));
+        bookstoreMetrics.paymentRefunded(payment.getProvider());
         log.info("Payment refunded: paymentId={}, orderId={}", payment.getId(), order.getId());
         return PaymentResponse.from(payment);
     }

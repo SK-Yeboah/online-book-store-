@@ -2,6 +2,10 @@
 
 Flyway owns the MySQL schema in **dev**, **Docker**, and **prod**. Hibernate uses `ddl-auto=validate` only — it will not alter MySQL `ENUM` columns.
 
+Local Prometheus + Grafana: see [monitoring.md](./monitoring.md).  
+Load testing: [load-testing.md](./load-testing.md).  
+Production gate: [production-checklist.md](./production-checklist.md).
+
 Payment-related statuses (`PENDING_PAYMENT`, `PAYMENT_FAILED`) are applied by:
 
 `src/main/resources/db/migration/V7__create_payments_and_extend_order_status.sql`
