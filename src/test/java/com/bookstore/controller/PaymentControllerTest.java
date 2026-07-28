@@ -75,18 +75,9 @@ class PaymentControllerTest {
     @WithMockUser(username = USERNAME, roles = "USER")
     @DisplayName("POST /api/payments/webhook/mock — success confirms order")
     void webhook_success_marksOrderConfirmed() throws Exception {
-        createIntent();
+        createIntent(IDEMPOTENCY_KEY);
 
-        String webhookBody = objectMapper.writeValueAsString(Map.of(
-                "reference", IDEMPOTENCY_KEY,
-                "success", true,
-                "providerPaymentId", "mock_evt_1",
-                "eventId", "mock.charge.success"));
-
-        mockMvc.perform(post("/api/payments/webhook/{provider}", "mock")
-                        .header("X-Webhook-Secret", "test_webhook_secret")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(webhookBody))
+        postWebhook(IDEMPOTENCY_KEY, true, "mock_evt_1")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SUCCEEDED"));
 
@@ -97,9 +88,139 @@ class PaymentControllerTest {
 
     @Test
     @WithMockUser(username = USERNAME, roles = "USER")
+    @DisplayName("duplicate webhook — second call is idempotent 200")
+    void webhook_duplicate_isIdempotent() throws Exception {
+        createIntent(IDEMPOTENCY_KEY);
+
+        postWebhook(IDEMPOTENCY_KEY, true, "mock_evt_1")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"));
+
+        postWebhook(IDEMPOTENCY_KEY, true, "mock_evt_1")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"));
+
+        mockMvc.perform(get("/api/orders/{id}", orderId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME, roles = "USER")
+    @DisplayName("verify then webhook — race stays CONFIRMED")
+    void verifyThenWebhook_isIdempotent() throws Exception {
+        createIntent(IDEMPOTENCY_KEY);
+
+        mockMvc.perform(get("/api/payments/verify/{reference}", IDEMPOTENCY_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"));
+
+        postWebhook(IDEMPOTENCY_KEY, true, "mock_evt_race")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"));
+
+        mockMvc.perform(get("/api/orders/{id}", orderId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME, roles = "USER")
+    @DisplayName("second intent new key — reuses active payment")
+    void createIntent_newKey_reusesActivePayment() throws Exception {
+        createIntent(IDEMPOTENCY_KEY);
+
+        mockMvc.perform(post("/api/payments/intent")
+                        .header("Idempotency-Key", "pay_test_order_1_retry")
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(objectMapper.writeValueAsString(
+                                new CreatePaymentIntentRequest(orderId, null, null)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reference").value(IDEMPOTENCY_KEY))
+                .andExpect(jsonPath("$.status").value("REQUIRES_ACTION"));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME, roles = "USER")
+    @DisplayName("same key after FAILED — requires new Idempotency-Key")
+    void createIntent_sameKeyAfterFailure_rejected() throws Exception {
+        createIntent(IDEMPOTENCY_KEY);
+
+        postWebhook(IDEMPOTENCY_KEY, false, "mock_evt_fail")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"));
+
+        mockMvc.perform(post("/api/payments/intent")
+                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(objectMapper.writeValueAsString(
+                                new CreatePaymentIntentRequest(orderId, null, null)))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME, roles = "USER")
+    @DisplayName("new key after FAILED — creates fresh intent and reopens order")
+    void createIntent_newKeyAfterFailure_createsNewPayment() throws Exception {
+        createIntent(IDEMPOTENCY_KEY);
+
+        postWebhook(IDEMPOTENCY_KEY, false, "mock_evt_fail")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"));
+
+        mockMvc.perform(get("/api/orders/{id}", orderId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PAYMENT_FAILED"));
+
+        String newKey = "pay_test_order_1_new";
+        mockMvc.perform(post("/api/payments/intent")
+                        .header("Idempotency-Key", newKey)
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(Objects.requireNonNull(objectMapper.writeValueAsString(
+                                new CreatePaymentIntentRequest(orderId, null, null)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reference").value(newKey))
+                .andExpect(jsonPath("$.status").value("REQUIRES_ACTION"));
+
+        mockMvc.perform(get("/api/orders/{id}", orderId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING_PAYMENT"));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME, roles = "USER")
+    @DisplayName("ignored webhook event — still HTTP 200")
+    void webhook_ignoredEvent_returns200() throws Exception {
+        String body = objectMapper.writeValueAsString(Map.of("ignored", true));
+
+        mockMvc.perform(post("/api/payments/webhook/{provider}", "mock")
+                        .header("X-Webhook-Secret", "test_webhook_secret")
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(body))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME, roles = "USER")
+    @DisplayName("GET /api/payments/verify/{reference} — confirms order when provider succeeds")
+    void verify_marksOrderConfirmed() throws Exception {
+        createIntent(IDEMPOTENCY_KEY);
+
+        mockMvc.perform(get("/api/payments/verify/{reference}", IDEMPOTENCY_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCEEDED"))
+                .andExpect(jsonPath("$.reference").value(IDEMPOTENCY_KEY));
+
+        mockMvc.perform(get("/api/orders/{id}", orderId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+    }
+
+    @Test
+    @WithMockUser(username = USERNAME, roles = "USER")
     @DisplayName("GET /api/payments/order/{orderId} — returns payment")
     void getByOrder_returnsPayment() throws Exception {
-        createIntent();
+        createIntent(IDEMPOTENCY_KEY);
 
         mockMvc.perform(get("/api/payments/order/{orderId}", orderId))
                 .andExpect(status().isOk())
@@ -107,13 +228,27 @@ class PaymentControllerTest {
                 .andExpect(jsonPath("$.reference").value(IDEMPOTENCY_KEY));
     }
 
-    private void createIntent() throws Exception {
+    private void createIntent(String key) throws Exception {
         mockMvc.perform(post("/api/payments/intent")
-                        .header("Idempotency-Key", IDEMPOTENCY_KEY)
+                        .header("Idempotency-Key", key)
                         .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
                         .content(Objects.requireNonNull(objectMapper.writeValueAsString(
                                 new CreatePaymentIntentRequest(orderId, null, null)))))
                 .andExpect(status().isOk());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions postWebhook(
+            String reference, boolean success, String providerPaymentId) throws Exception {
+        String webhookBody = objectMapper.writeValueAsString(Map.of(
+                "reference", reference,
+                "success", success,
+                "providerPaymentId", providerPaymentId,
+                "eventId", success ? "mock.charge.success" : "mock.charge.failed"));
+
+        return mockMvc.perform(post("/api/payments/webhook/{provider}", "mock")
+                .header("X-Webhook-Secret", "test_webhook_secret")
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(webhookBody)));
     }
 
     private void registerUser() throws Exception {

@@ -34,6 +34,7 @@ services:
   # ── Application ────────────────────────────────────────────────────────────
   # Comment out the 'app' service if you prefer to run the app directly with
   # 'mvn spring-boot:run' and only use docker-compose for MySQL + Redis.
+  # Schema: Flyway runs on startup (dev profile). See docs/docker-schema.md.
   app:
     build: .
     container_name: bookstore-app

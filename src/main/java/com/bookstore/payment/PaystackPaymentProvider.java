@@ -113,12 +113,10 @@ public class PaystackPaymentProvider implements PaymentProvider{
             boolean success = "charge.success".equals(event);
             boolean failed = event.startsWith("charge.") && !success;
             if (!success && !failed) {
-                throw new BookstoreException(
-                        ErrorCode.PAYMENT_WEBHOOK_INVALID.name(),
-                        "Unsupported Paystack event: " + event,
-                        HttpStatus.BAD_REQUEST);
+                log.info("Ignoring unsupported Paystack event: {}", event);
+                return ProviderWebhookResult.ignoredEvent();
             }
-            return new ProviderWebhookResult(new ProviderWebhookCommand(
+            return ProviderWebhookResult.of(new ProviderWebhookCommand(
                     String.valueOf(data.path("id").asLong()),
                     data.path("reference").asText(),
                     success,
@@ -151,6 +149,48 @@ public class PaystackPaymentProvider implements PaymentProvider{
         }
     }
 
+    @Override
+    public ProviderRefundResult refund(String reference, Long amountMinorUnits) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("transaction", reference);
+        if (amountMinorUnits != null) {
+            body.put("amount", amountMinorUnits);
+        }
+
+        try {
+            String responseBody = payStackRestClient.post()
+                    .uri("/refund")
+                    .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                    .body(body)
+                    .retrieve()
+                    .onStatus(status -> status.isError(), (req, res) -> {
+                        throw new BookstoreException(
+                                ErrorCode.REFUND_FAILED.name(),
+                                "Paystack refund failed: HTTP " + res.getStatusCode(),
+                                HttpStatus.BAD_GATEWAY);
+                    })
+                    .body(String.class);
+            JsonNode root = objectMapper.readTree(responseBody);
+            if (!root.path("status").asBoolean(false)) {
+                throw new BookstoreException(
+                        ErrorCode.REFUND_FAILED.name(),
+                        "Paystack refund failed: " + root.path("message").asText(),
+                        HttpStatus.BAD_GATEWAY);
+            }
+            JsonNode data = root.path("data");
+            return new ProviderRefundResult(
+                    data.path("id").asText(null),
+                    data.path("status").asText("pending"));
+        } catch (BookstoreException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Paystack refund error for reference={}", reference, ex);
+            throw new BookstoreException(
+                    ErrorCode.REFUND_FAILED.name(),
+                    "Failed to refund Paystack payment",
+                    HttpStatus.BAD_GATEWAY);
+        }
+    }
 
     private static long toMinorUnits(double amount) {
         return Math.round(amount * 100);

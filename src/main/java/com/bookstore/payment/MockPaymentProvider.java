@@ -1,6 +1,7 @@
 package com.bookstore.payment;
 
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
@@ -23,6 +24,10 @@ public class MockPaymentProvider implements PaymentProvider {
 
     private final PaymentProperties paymentProperties;
     private final ObjectMapper objectMapper;
+
+    /** Defaults to true so verify/webhook paths succeed unless a test overrides. */
+    private final AtomicBoolean confirmSucceeds = new AtomicBoolean(true);
+    private final AtomicBoolean confirmThrows = new AtomicBoolean(false);
 
     @Override
     public String name() {
@@ -50,7 +55,10 @@ public class MockPaymentProvider implements PaymentProvider {
 
         try {
             JsonNode root = objectMapper.readTree(rawBody);
-            return new ProviderWebhookResult(new ProviderWebhookCommand(
+            if (root.path("ignored").asBoolean(false)) {
+                return ProviderWebhookResult.ignoredEvent();
+            }
+            return ProviderWebhookResult.of(new ProviderWebhookCommand(
                     root.path("providerPaymentId").asText("mock_evt"),
                     root.path("reference").asText(),
                     root.path("success").asBoolean(false),
@@ -62,5 +70,32 @@ public class MockPaymentProvider implements PaymentProvider {
                     "Invalid mock webhook payload",
                     HttpStatus.BAD_REQUEST);
         }
+    }
+
+    @Override
+    public boolean confirmPayment(String reference) {
+        if (confirmThrows.get()) {
+            throw new IllegalStateException("Mock provider unavailable");
+        }
+        return confirmSucceeds.get();
+    }
+
+    @Override
+    public ProviderRefundResult refund(String reference, Long amountMinorUnits) {
+        return new ProviderRefundResult("mock_refund_" + reference, "processed");
+    }
+
+    public void setConfirmSucceeds(boolean value) {
+        confirmThrows.set(false);
+        confirmSucceeds.set(value);
+    }
+
+    public void setConfirmThrows(boolean value) {
+        confirmThrows.set(value);
+    }
+
+    public void resetConfirmBehavior() {
+        confirmSucceeds.set(true);
+        confirmThrows.set(false);
     }
 }

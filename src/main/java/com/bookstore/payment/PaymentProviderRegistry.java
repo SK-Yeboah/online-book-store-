@@ -1,9 +1,9 @@
 package com.bookstore.payment;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.Objects;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -17,8 +17,12 @@ public class PaymentProviderRegistry {
     private final Map<String, PaymentProvider> providers;
 
     public PaymentProviderRegistry(List<PaymentProvider> providerList) {
-        this.providers = providerList.stream()
-                .collect(Collectors.toMap(PaymentProvider::name, Function.identity()));
+        Map<String, PaymentProvider> byName = new HashMap<>();
+        for (PaymentProvider provider : providerList) {
+            Objects.requireNonNull(provider, "PaymentProvider must not be null");
+            byName.put(provider.name(), provider);
+        }
+        this.providers = Map.copyOf(byName);
     }
 
     public PaymentProvider getRequired(String name) {

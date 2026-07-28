@@ -1,5 +1,7 @@
 package com.bookstore.repository;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -15,4 +17,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByIdAndUser_Id(Long id, Long userId);
 
     Page<Order> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    List<Order> findByStatusAndCreatedAtBefore(Order.OrderStatus status, LocalDateTime cutoff, Pageable pageable);
 }

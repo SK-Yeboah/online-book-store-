@@ -73,7 +73,10 @@ jobs:
           DB_NAME: bookstore_test
           DB_USERNAME: root
           DB_PASSWORD: test_password
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_SECRET: ci_test_jwt_secret_must_be_at_least_32_bytes_xx
+          PAYSTACK_SECRET_KEY: sk_test_ci_placeholder
+          PAYSTACK_PUBLIC_KEY: pk_test_ci_placeholder
+          PAYMENT_CALLBACK_URL: http://localhost:3000/payment/callback
 
       - name: Upload test results
         if: always()

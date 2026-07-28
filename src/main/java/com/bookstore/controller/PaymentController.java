@@ -51,7 +51,7 @@ public class PaymentController {
             @RequestHeader(value = "X-Paystack-Signature", required = false) String paystackSignature,
             @RequestHeader(value = "X-Webhook-Secret", required = false) String mockSecret) {
         String signature = paystackSignature != null ? paystackSignature : mockSecret;
-        return ResponseEntity.ok(paymentService.handleWebhook(provider, rawBody, signature));
+        return ResponseEntity.ok(paymentService.handleWebhook(provider, rawBody, signature).orElse(null));
     }
 
     @Operation(summary = "Get latest payment for an order")
@@ -60,6 +60,14 @@ public class PaymentController {
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long orderId) {
         return ResponseEntity.ok(paymentService.findByOrder(resolveUserId(userDetails), orderId));
+    }
+
+    @Operation(summary = "Verify payment with provider after redirect (webhook fallback)")
+    @GetMapping("/verify/{reference}")
+    public ResponseEntity<PaymentResponse> verify(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable String reference) {
+        return ResponseEntity.ok(paymentService.verifyByReference(resolveUserId(userDetails), reference));
     }
 
     private Long resolveUserId(UserDetails userDetails) {

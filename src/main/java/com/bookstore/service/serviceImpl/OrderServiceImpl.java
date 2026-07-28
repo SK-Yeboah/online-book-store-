@@ -165,8 +165,16 @@ public class OrderServiceImpl implements OrderService {
         Long id  = Objects.requireNonNull(orderId, "Order id must not be null");
         Order order = orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
 
-        if(order.getStatus() != Order.OrderStatus.PENDING_PAYMENT) {
-            throw new BookstoreException(ErrorCode.ORDER_NOT_PAYABLE.name(), "Order is not awaiting payment", HttpStatus.BAD_REQUEST);
+        if (order.getStatus() == OrderStatus.CONFIRMED) {
+            log.debug("Order already confirmed (idempotent markPaid): orderId={}", id);
+            return;
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw new BookstoreException(
+                    ErrorCode.ORDER_NOT_PAYABLE.name(),
+                    "Order is not awaiting payment",
+                    HttpStatus.BAD_REQUEST);
         }
 
         order.setStatus(OrderStatus.CONFIRMED);
@@ -179,16 +187,86 @@ public class OrderServiceImpl implements OrderService {
     public void markPaymentFailed(Long orderId){
         Long id = Objects.requireNonNull(orderId, "Order is must not be null");
         Order order = orderRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("order", "id", id));
-        
-        if (order.getStatus() != OrderStatus.PENDING_PAYMENT){
-            throw new BookstoreException(ErrorCode.ORDER_NOT_PAYABLE.name(), "Order is not awaiting payment", HttpStatus.BAD_REQUEST);
+
+        if (order.getStatus() == OrderStatus.PAYMENT_FAILED) {
+            log.debug("Order already payment-failed (idempotent markPaymentFailed): orderId={}", id);
+            return;
         }
-        
+
+        if (order.getStatus() == OrderStatus.CONFIRMED) {
+            log.warn("Ignoring payment-failed for already confirmed order: orderId={}", id);
+            return;
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw new BookstoreException(
+                    ErrorCode.ORDER_NOT_PAYABLE.name(),
+                    "Order is not awaiting payment",
+                    HttpStatus.BAD_REQUEST);
+        }
+
         restoreStock(id);
         order.setStatus(OrderStatus.PAYMENT_FAILED);
         log.info("Order Payment failed: orderId={}", id);
     }
-    
+
+    @Override
+    @Transactional
+    public void reopenForPayment(Long orderId) {
+        Long id = Objects.requireNonNull(orderId, "Order id must not be null");
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("order", "id", id));
+
+        if (order.getStatus() == OrderStatus.PENDING_PAYMENT) {
+            return;
+        }
+
+        if (order.getStatus() != OrderStatus.PAYMENT_FAILED) {
+            throw new BookstoreException(
+                    ErrorCode.ORDER_NOT_PAYABLE.name(),
+                    "Order cannot be reopened for payment from status " + order.getStatus(),
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        List<OrderItem> items = orderItemRepository.findByOrderIdWithBooks(id);
+        List<OrderItem> sorted = items.stream()
+                .sorted(Comparator.comparing(item -> item.getBook().getId()))
+                .toList();
+
+        for (OrderItem item : sorted) {
+            Long bookId = item.getBook().getId();
+            Book book = bookRepository.findByIdForUpdate(bookId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Book", "id", bookId));
+            validateStock(book, item.getQuantity());
+            book.setStockQuantity(book.getStockQuantity() - item.getQuantity());
+        }
+
+        order.setStatus(OrderStatus.PENDING_PAYMENT);
+        log.info("Order reopened for payment: orderId={}", id);
+    }
+
+
+    @Override
+    @Transactional
+    public void cancelUnpaid(Long orderId) {
+        Long id = Objects.requireNonNull(orderId, "Order id must not be null");
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
+
+        if (order.getStatus() == OrderStatus.CANCELLED) {
+            return;
+        }
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw new BookstoreException(
+                    ErrorCode.ORDER_NOT_PAYABLE.name(),
+                    "Only PENDING_PAYMENT orders can be expired",
+                    HttpStatus.BAD_REQUEST);
+        }
+        restoreStock(id);
+        order.setStatus(OrderStatus.CANCELLED);
+        log.info("Unpaid order cancelled (expired): orderId={}", id);
+    }
+
 
     private OrderResponse toOrderResponse(Order order) {
         List<OrderItem> items = orderItemRepository.findByOrderIdWithBooks(order.getId());

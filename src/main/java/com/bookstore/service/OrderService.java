@@ -14,4 +14,10 @@ public interface OrderService {
     OrderResponse updateStatus(Long orderId, UpdateOrderStatusRequest request);
     void markPaid(Long orderId);
     void markPaymentFailed(Long orderId);
+
+    /** Re-reserve stock and move PAYMENT_FAILED → PENDING_PAYMENT for a payment retry. */
+    void reopenForPayment(Long orderId);
+
+    /** Idempotent: PENDING_PAYMENT → CANCELLED + restore stock. */
+    void cancelUnpaid(Long orderId);
 }
