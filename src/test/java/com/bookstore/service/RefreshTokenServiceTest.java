@@ -49,7 +49,7 @@ class RefreshTokenServiceTest {
     @Test
     @DisplayName("createRefreshToken — persists a non-null, non-expired token for the user")
     void createRefreshToken_persistsValidToken() {
-        RefreshToken token = refreshTokenService.createRefreshToken("rftestuser");
+        RefreshToken token = refreshTokenService.createRefreshToken(testUser);
 
         assertThat(token.getToken()).isNotBlank();
         assertThat(token.getUser().getUsername()).isEqualTo("rftestuser");
@@ -61,8 +61,8 @@ class RefreshTokenServiceTest {
     @Test
     @DisplayName("createRefreshToken — each call produces a unique token string")
     void createRefreshToken_uniquePerCall() {
-        String t1 = refreshTokenService.createRefreshToken("rftestuser").getToken();
-        String t2 = refreshTokenService.createRefreshToken("rftestuser").getToken();
+        String t1 = refreshTokenService.createRefreshToken(testUser).getToken();
+        String t2 = refreshTokenService.createRefreshToken(testUser).getToken();
         assertThat(t1).isNotEqualTo(t2);
     }
 
@@ -71,7 +71,7 @@ class RefreshTokenServiceTest {
     @Test
     @DisplayName("validateRefreshToken — returns token when valid")
     void validateRefreshToken_returnsToken_whenValid() {
-        RefreshToken saved = refreshTokenService.createRefreshToken("rftestuser");
+        RefreshToken saved = refreshTokenService.createRefreshToken(testUser);
 
         RefreshToken result = refreshTokenService.validateRefreshToken(saved.getToken());
 
@@ -102,8 +102,8 @@ class RefreshTokenServiceTest {
     @DisplayName("validateRefreshToken — detects reuse, revokes ALL user tokens, throws InvalidTokenException")
     void validateRefreshToken_detectsTokenTheft_revokesAllSessions() {
         // Create two valid tokens for the same user
-        RefreshToken token1 = refreshTokenService.createRefreshToken("rftestuser");
-        refreshTokenService.createRefreshToken("rftestuser"); // token2 — should also be revoked
+        RefreshToken token1 = refreshTokenService.createRefreshToken(testUser);
+        refreshTokenService.createRefreshToken(testUser); // token2 — should also be revoked
 
         // Rotate token1 — marks it used=true, creates token3
         refreshTokenService.rotateRefreshToken(token1);
@@ -123,7 +123,7 @@ class RefreshTokenServiceTest {
     @Test
     @DisplayName("rotateRefreshToken — old token is marked used (not deleted), new token is created")
     void rotateRefreshToken_marksOldUsed_createsNewToken() {
-        RefreshToken original = refreshTokenService.createRefreshToken("rftestuser");
+        RefreshToken original = refreshTokenService.createRefreshToken(testUser);
         String originalTokenStr = original.getToken();
 
         RefreshToken rotated = refreshTokenService.rotateRefreshToken(original);
@@ -143,8 +143,8 @@ class RefreshTokenServiceTest {
     @Test
     @DisplayName("revokeToken — removes the single specified token")
     void revokeToken_deletesOnlyTargetToken() {
-        RefreshToken t1 = refreshTokenService.createRefreshToken("rftestuser");
-        RefreshToken t2 = refreshTokenService.createRefreshToken("rftestuser");
+        RefreshToken t1 = refreshTokenService.createRefreshToken(testUser);
+        RefreshToken t2 = refreshTokenService.createRefreshToken(testUser);
 
         refreshTokenService.revokeToken(t1.getToken());
 
@@ -157,8 +157,8 @@ class RefreshTokenServiceTest {
     @Test
     @DisplayName("revokeAllUserTokens — removes every token belonging to the user")
     void revokeAllUserTokens_deletesAll() {
-        refreshTokenService.createRefreshToken("rftestuser");
-        refreshTokenService.createRefreshToken("rftestuser");
+        refreshTokenService.createRefreshToken(testUser);
+        refreshTokenService.createRefreshToken(testUser);
 
         refreshTokenService.revokeAllUserTokens(testUser.getId());
 
@@ -171,7 +171,7 @@ class RefreshTokenServiceTest {
     @Test
     @DisplayName("cleanupExpiredTokens — removes expired tokens, keeps valid ones")
     void cleanupExpiredTokens_purguesExpiredOnly() {
-        RefreshToken valid = refreshTokenService.createRefreshToken("rftestuser");
+        RefreshToken valid = refreshTokenService.createRefreshToken(testUser);
         refreshTokenRepository.save(
                 new RefreshToken("stale-token", testUser, Instant.now().minusSeconds(1)));
 

@@ -67,6 +67,9 @@ module "alb" {
   vpc_id                = module.network.vpc_id
   public_subnet_ids     = module.network.public_subnet_ids
   alb_security_group_id = module.network.alb_security_group_id
+  enable_https          = var.enable_https
+  domain_name           = var.domain_name
+  route53_zone_id       = var.route53_zone_id
   tags                  = local.tags
 }
 

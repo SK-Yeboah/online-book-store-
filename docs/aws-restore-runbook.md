@@ -5,6 +5,9 @@
 > **Account**: `177555066761`  
 > **Last captured**: 2026-03-25
 
+> **Preferred path:** use Terraform instead of this manual checklist — see [`infra/README.md`](../infra/README.md).  
+> This runbook remains the human-readable reference for what Terraform creates.
+
 ---
 
 ## Architecture Diagram

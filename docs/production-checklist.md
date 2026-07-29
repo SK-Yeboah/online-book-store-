@@ -38,9 +38,21 @@ Use this before enabling public traffic or flipping `DEPLOY_TO_AWS=true`.
 | `CORS_ALLOWED_ORIGINS` | Comma-separated HTTPS origins |
 | `REDIS_HOST` / `REDIS_PORT` | ElastiCache or equivalent |
 
+## AWS infra (IaC)
+
+Create staging with Terraform (not the Console runbook):
+
+```bash
+cd infra/envs/staging
+cp terraform.tfvars.example terraform.tfvars   # edit secrets / image
+terraform init && terraform apply
+```
+
+Full steps: [`infra/README.md`](../infra/README.md). Manual fallback: [`aws-restore-runbook.md`](./aws-restore-runbook.md).
+
 ## AWS deploy enablement
 
-CI keeps `DEPLOY_TO_AWS: false` until the above staging gate passes and these GitHub secrets/vars exist:
+CI keeps deploy jobs `if: false` until the above staging gate passes and these GitHub secrets/vars exist:
 
 - AWS credentials / OIDC role
 - ECS cluster, service, task definition names

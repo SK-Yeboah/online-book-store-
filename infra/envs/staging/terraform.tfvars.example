@@ -25,3 +25,10 @@ cors_allowed_origins = "*"
 
 rate_limit_capacity = 60
 rate_limit_refill   = 60
+
+# HTTPS for Paystack webhooks (requires a domain in Route53 in this AWS account)
+# enable_https    = true
+# domain_name     = "api.staging.example.com"
+# route53_zone_id = "Z0123456789ABCDEFGHIJ"
+# Then: terraform apply
+# Paystack webhook: terraform output -raw paystack_webhook_url

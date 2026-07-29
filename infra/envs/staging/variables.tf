@@ -115,3 +115,21 @@ variable "rate_limit_refill" {
   type    = number
   default = 60
 }
+
+variable "enable_https" {
+  type        = bool
+  description = "ACM + HTTPS listener + HTTP redirect + Route53 alias (needs a domain in Route53)"
+  default     = false
+}
+
+variable "domain_name" {
+  type        = string
+  description = "API hostname, e.g. api.staging.example.com"
+  default     = ""
+}
+
+variable "route53_zone_id" {
+  type        = string
+  description = "Route53 public hosted zone ID for domain_name"
+  default     = ""
+}

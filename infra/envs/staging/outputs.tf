@@ -1,10 +1,25 @@
 output "alb_dns_name" {
-  description = "Public ALB DNS - curl http://THIS/actuator/health"
+  description = "Raw ALB DNS (HTTP). Prefer app_base_url when HTTPS is enabled."
   value       = module.alb.alb_dns_name
 }
 
+output "app_base_url" {
+  description = "Public API base URL"
+  value       = module.alb.app_base_url
+}
+
 output "health_url" {
-  value = "http://${module.alb.alb_dns_name}/actuator/health"
+  description = "Health check URL"
+  value       = module.alb.health_url
+}
+
+output "paystack_webhook_url" {
+  description = "Paste into Paystack Test Webhook URL (requires HTTPS)"
+  value       = module.alb.paystack_webhook_url
+}
+
+output "acm_certificate_arn" {
+  value = module.alb.acm_certificate_arn
 }
 
 output "ecs_cluster_name" {
