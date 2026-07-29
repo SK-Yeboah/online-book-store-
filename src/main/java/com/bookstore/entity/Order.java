@@ -1,14 +1,21 @@
 package com.bookstore.entity;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.Data;
-import lombok.NoArgsConstructor;
-import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 @Data
-@Entity
-@Table(name= "orders")
 @NoArgsConstructor
+@Entity
+@Table(name = "orders")
 @EqualsAndHashCode(callSuper = true)
 public class Order extends BaseEntity {
 
@@ -21,23 +28,21 @@ public class Order extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private OrderStatus  status = OrderStatus.PENDING;
+    private OrderStatus status = OrderStatus.PENDING;
 
-    public Order(User user, Double totalAmount){
+    public Order(User user, Double totalAmount) {
         this.user = user;
         this.totalAmount = totalAmount;
-
+        this.status = OrderStatus.PENDING_PAYMENT;
     }
-
 
     public enum OrderStatus {
         PENDING,
-        CONFIRMED, 
-        SHIPPED, 
-        DELIVERED, 
+        PENDING_PAYMENT,
+        PAYMENT_FAILED,
+        CONFIRMED,
+        SHIPPED,
+        DELIVERED,
         CANCELLED
     }
-
-
-    
 }

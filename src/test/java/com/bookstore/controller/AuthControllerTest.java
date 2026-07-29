@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import java.util.Objects;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -34,10 +36,10 @@ class AuthControllerTest {
         RegisterRequest req = new RegisterRequest("testuser", "test@example.com", "password123");
 
         mockMvc.perform(post("/api/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isCreated())
-                .andExpect(content().string("User registered successfully"));
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(req))))
+        .andExpect(status().isCreated())
+        .andExpect(content().string("User registered successfully"));
     }
 
     @Test
@@ -46,8 +48,8 @@ class AuthControllerTest {
         RegisterRequest req = new RegisterRequest("", "test@example.com", "password123");
 
         mockMvc.perform(post("/api/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(req)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(req))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[?(@.field=='username')]").exists());
     }
@@ -58,8 +60,8 @@ class AuthControllerTest {
         RegisterRequest req = new RegisterRequest("testuser", "not-an-email", "password123");
 
         mockMvc.perform(post("/api/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(req)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(req))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -69,14 +71,14 @@ class AuthControllerTest {
         RegisterRequest req = new RegisterRequest("dupuser", "first@example.com", "password123");
 
         mockMvc.perform(post("/api/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(req)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(req))))
                 .andExpect(status().isCreated());
 
         RegisterRequest dup = new RegisterRequest("dupuser", "second@example.com", "password123");
         mockMvc.perform(post("/api/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(dup)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(dup))))
                 .andExpect(status().isConflict());
     }
 
@@ -87,16 +89,16 @@ class AuthControllerTest {
     void login_validCredentials_returns200WithTokens() throws Exception {
         // Register first
         mockMvc.perform(post("/api/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(
-                        new RegisterRequest("loginuser", "login@example.com", "password123"))))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(
+                        new RegisterRequest("loginuser", "login@example.com", "password123")))))
                 .andExpect(status().isCreated());
 
         // Then login
         LoginRequest login = new LoginRequest("loginuser", "password123");
         mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(login)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(login))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.refreshToken").isNotEmpty())
@@ -108,15 +110,15 @@ class AuthControllerTest {
     @DisplayName("POST /api/auth/login — 401 on wrong password")
     void login_wrongPassword_returns401() throws Exception {
         mockMvc.perform(post("/api/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(
-                        new RegisterRequest("wrongpwuser", "wrongpw@example.com", "password123"))))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(
+                        new RegisterRequest("wrongpwuser", "wrongpw@example.com", "password123")))))
                 .andExpect(status().isCreated());
 
         LoginRequest bad = new LoginRequest("wrongpwuser", "wrongpassword");
         mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(bad)))
+                .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                .content(Objects.requireNonNull(objectMapper.writeValueAsString(bad))))
                 .andExpect(status().isUnauthorized());
     }
 }

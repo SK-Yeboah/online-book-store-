@@ -7,6 +7,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,13 +16,16 @@ import org.springframework.util.StringUtils;
 import com.bookstore.dto.request.LoginRequest;
 import com.bookstore.dto.request.RegisterRequest;
 import com.bookstore.dto.response.JwtResponse;
+import com.bookstore.entity.Cart;
 import com.bookstore.entity.RefreshToken;
 import com.bookstore.entity.User;
 import com.bookstore.exception.DuplicateResourceException;
 import com.bookstore.exception.ResourceNotFoundException;
+import com.bookstore.repository.CartRepository;
 import com.bookstore.repository.UserRepository;
 import com.bookstore.security.Jwtutil;
 import com.bookstore.security.TokenBlacklist;
+import com.bookstore.security.UserPrincipal;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -32,16 +36,15 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class UserService {
 
-    private final UserRepository userRepository;;
+    private final UserRepository userRepository;
     private final AuthenticationManager authenticationManager;
     private final PasswordEncoder passwordEncoder;
-    // private final CartRepository cartRepository;
-    private final UserDetailsService userDetailsService;
+    private final CartRepository cartRepository;
     private final Jwtutil jwtutil;
-    // private final RefreshToken refreshToken;
     private final AccountLockService accountLockService;
     private final TokenBlacklist tokenBlacklist;
     private final RefreshTokenService refreshTokenService;
+
 
 
     //Register
@@ -62,6 +65,7 @@ public class UserService {
        try{
             User user = new User(username, passwordEncoder.encode(registerRequest.getPassword()), email, User.Role.ROLE_USER);
             User savedUser = userRepository.saveAndFlush(user);
+            cartRepository.save(new Cart(savedUser));
             
             log.info("New user registered successfully: {}", username);
             return "User registered successfully";
@@ -83,24 +87,25 @@ public class UserService {
         accountLockService.checkNotLocked(username);
 
         try{
-            authenticationManager.authenticate(
+            Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(username, request.getPassword())
             );
 
             // Cleanup Service
             accountLockService.registerSuccess(username);
 
-            UserDetails userdetails = userDetailsService.loadUserByUsername(username);
-            String  accessToken = jwtutil.generateAccessToken(userdetails);
-            RefreshToken currentRefreshToken = refreshTokenService.createRefreshToken(username); // Ensure this is active
-            
+            // Reuse principal from authenticate() — includes JPA User (no second lookup)
+            UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+            String accessToken = jwtutil.generateAccessToken(principal);
+            RefreshToken currentRefreshToken = refreshTokenService.createRefreshToken(principal.getUser());
+
             log.info("Login Successful (usernameLen={})", username.length());
-                
+
             return new JwtResponse(
                     accessToken,
                     currentRefreshToken.getToken(),
-                    userdetails.getUsername(),
-                    userdetails.getAuthorities().toString()
+                    principal.getUsername(),
+                    principal.getAuthorities().toString()
             );
 
         }catch(BadCredentialsException ex){
@@ -120,7 +125,7 @@ public class UserService {
         // so its scalar fields are in memory. current.getUser() is a detached lazy proxy
         // that throws LazyInitializationException outside its original session.
         String username = rotated.getUser().getUsername();
-        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        UserDetails userDetails = UserPrincipal.from(rotated.getUser());
         String accessToken = jwtutil.generateAccessToken(userDetails);
         log.info("Token rotated successfully for user (usernameLen={})", username.length());
         return new JwtResponse(accessToken, rotated.getToken(), username, rotated.getUser().getRole().name());

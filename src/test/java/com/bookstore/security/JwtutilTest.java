@@ -9,6 +9,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.*;
 
@@ -23,8 +24,8 @@ class JwtutilTest {
     @BeforeEach
     void setUp() {
         jwtUtil = new Jwtutil();
-        ReflectionTestUtils.setField(jwtUtil, "secret", TEST_SECRET_HEX);
-        ReflectionTestUtils.setField(jwtUtil, "accessTokenExpiration", 900_000L);
+        ReflectionTestUtils.setField(Objects.requireNonNull(jwtUtil), "secret", TEST_SECRET_HEX);
+        ReflectionTestUtils.setField(Objects.requireNonNull(jwtUtil), "accessTokenExpiration", 900_000L);
         jwtUtil.init();
     }
 
@@ -83,8 +84,8 @@ class JwtutilTest {
     @DisplayName("fails to initialise when secret is blank")
     void init_blankSecret_throwsIllegalState() {
         Jwtutil bad = new Jwtutil();
-        ReflectionTestUtils.setField(bad, "secret", "");
-        ReflectionTestUtils.setField(bad, "accessTokenExpiration", 900_000L);
+        ReflectionTestUtils.setField(Objects.requireNonNull(bad), "secret", "");
+        ReflectionTestUtils.setField(Objects.requireNonNull(bad), "accessTokenExpiration", 900_000L);
         assertThatThrownBy(bad::init).isInstanceOf(IllegalStateException.class);
     }
 

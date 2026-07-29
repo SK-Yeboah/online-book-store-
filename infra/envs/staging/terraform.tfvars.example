@@ -1,0 +1,34 @@
+# Copy to terraform.tfvars and fill in. Never commit terraform.tfvars.
+
+aws_region  = "us-east-1"
+name_prefix = "bookstore"
+
+# Initial image (must be pullable). CI updates the running task after first push.
+# develop → :staging-latest ; main → :latest
+container_image = "ghcr.io/sk-yeboah/online-book-store:staging-latest"
+
+# Required if the GHCR package is private
+# ghcr_username = "YOUR_GITHUB_USERNAME"
+# ghcr_token    = "ghp_..."
+
+# Lab: mock payments first (no Paystack needed)
+payment_provider = "mock"
+
+# When switching to Paystack test mode:
+# payment_provider       = "paystack"
+# paystack_secret_key    = "sk_test_..."
+# paystack_public_key    = "pk_test_..."
+# payment_callback_url   = "https://your-frontend/payment/callback"
+# payment_webhook_secret = "unused-for-paystack-sig"  # still injected; Paystack uses HMAC
+
+cors_allowed_origins = "*"
+
+rate_limit_capacity = 60
+rate_limit_refill   = 60
+
+# HTTPS for Paystack webhooks (requires a domain in Route53 in this AWS account)
+# enable_https    = true
+# domain_name     = "api.staging.example.com"
+# route53_zone_id = "Z0123456789ABCDEFGHIJ"
+# Then: terraform apply
+# Paystack webhook: terraform output -raw paystack_webhook_url

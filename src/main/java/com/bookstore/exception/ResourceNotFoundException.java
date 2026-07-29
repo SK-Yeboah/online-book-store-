@@ -4,7 +4,6 @@ package com.bookstore.exception;
 // package com.bookstore.exception.resource;
 
 import org.springframework.http.HttpStatus;
-import com.bookstore.exception.BookstoreException;
 import com.bookstore.exception.handler.ErrorCode;
 
 public class ResourceNotFoundException extends BookstoreException {
@@ -21,7 +20,9 @@ public class ResourceNotFoundException extends BookstoreException {
             case "user"  -> ErrorCode.USER_NOT_FOUND;
             case "book"  -> ErrorCode.BOOK_NOT_FOUND;
             case "cart"  -> ErrorCode.CART_NOT_FOUND;
+            case "cartitem", "cart item", "cart_item" -> ErrorCode.CART_ITEM_NOT_FOUND;
             case "order" -> ErrorCode.ORDER_NOT_FOUND;
+            case "payment" -> ErrorCode.PAYMENT_NOT_FOUND;
             default      -> ErrorCode.BAD_REQUEST;
         };
     }

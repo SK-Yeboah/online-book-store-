@@ -6,10 +6,20 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-cd-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/online-book-store
   JAVA_VERSION: '17'
+  AWS_REGION: us-east-1
+  # AWS deploy jobs stay disabled until staging gate + secrets are ready.
+  # See docs/production-checklist.md. Set DEPLOY_TO_AWS to 'true' only after that.
+  DEPLOY_TO_AWS: 'false'
 
 jobs:
 
@@ -17,6 +27,7 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
       mysql:
@@ -62,7 +73,10 @@ jobs:
           DB_NAME: bookstore_test
           DB_USERNAME: root
           DB_PASSWORD: test_password
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_SECRET: ci_test_jwt_secret_must_be_at_least_32_bytes_xx
+          PAYSTACK_SECRET_KEY: sk_test_ci_placeholder
+          PAYSTACK_PUBLIC_KEY: pk_test_ci_placeholder
+          PAYMENT_CALLBACK_URL: http://localhost:3000/payment/callback
 
       - name: Upload test results
         if: always()
@@ -77,24 +91,23 @@ jobs:
     name: Security Scan
     runs-on: ubuntu-latest
     needs: build-and-test
-    if: github.event_name == 'push'
+    timeout-minutes: 15
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     permissions:
       contents: read
-      security-events: write  
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
           severity: CRITICAL,HIGH
-          # exit-code '0' — scan runs and results appear in the Security tab
-          # but the build is not blocked. Change to '1' once all CVEs are resolved.
-          exit-code: '0'
+          # Fail the pipeline when unresolved high/critical findings are present.
+          exit-code: '1'
           format: sarif
           output: trivy-results.sarif
 
@@ -111,13 +124,14 @@ jobs:
     name: Build & Push Image
     runs-on: ubuntu-latest
     needs: [build-and-test, security-scan]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') && github.event_name == 'push'
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
 
     outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
+      image: ${{ steps.vars.outputs.image }}
 
     steps:
       - name: Checkout code
@@ -127,39 +141,132 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Normalize image name
+        id: image
+        run: |
+          # GHCR/Docker tags must be lowercase (github.repository_owner may contain capitals).
+          echo "name=$(echo "${{ github.repository_owner }}/online-book-store" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Compute image tags
+        id: vars
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          IMAGE_BASE="${{ env.REGISTRY }}/${{ steps.image.outputs.name }}"
+          IMAGE_SHA="${IMAGE_BASE}:sha-${SHORT_SHA}"
+          echo "image=${IMAGE_SHA}" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+            echo "tags=${IMAGE_SHA},${IMAGE_BASE}:latest" >> "$GITHUB_OUTPUT"
+          else
+            echo "tags=${IMAGE_SHA},${IMAGE_BASE}:staging-latest" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Extract image metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=sha,prefix=sha-,format=short
-            type=raw,value=latest
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.vars.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          provenance: false
+          cache-from: type=gha,ignore-error=true
+          cache-to: type=gha,mode=max,ignore-error=true
 
-  # ── CD: Deploy to production ──────────────────────────────────────────────
-  # Uncomment and configure once your cloud platform is set up.
-  # deploy:
-  #   name: Deploy to Production
-  #   runs-on: ubuntu-latest
-  #   needs: build-image
-  #   environment: production        # requires manual approval in GitHub
-  #
-  #   steps:
-  #     - name: Deploy to Railway / Render / AWS ECS
-  #       run: echo "Add your deployment step here"
+  # ── CD: Deploy to staging ──────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build-image
+    # Disabled until AWS is recreated and GitHub secrets/vars are set.
+    if: false
+    timeout-minutes: 20
+    environment: staging
+    permissions:
+      contents: read
+    env:
+      ECS_CLUSTER: ${{ vars.STAGING_ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.STAGING_ECS_SERVICE }}
+      ECS_TASK_DEFINITION: ${{ vars.STAGING_ECS_TASK_DEFINITION }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Register new task definition revision (staging)
+        id: taskdef
+        run: |
+          aws ecs describe-task-definition --task-definition "${ECS_TASK_DEFINITION}" --query 'taskDefinition' > task-definition.json
+          jq --arg IMAGE "${{ needs.build-image.outputs.image }}" '
+            .containerDefinitions[0].image = $IMAGE
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
+          ' task-definition.json > new-task-definition.json
+          TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "task_def_arn=${TASK_DEF_ARN}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy staging service
+        run: |
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${ECS_SERVICE}" \
+            --task-definition "${{ steps.taskdef.outputs.task_def_arn }}" \
+            --force-new-deployment
+          aws ecs wait services-stable --cluster "${ECS_CLUSTER}" --services "${ECS_SERVICE}"
+
+  # ── CD: Deploy to production ───────────────────────────────────────────────
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build-image
+    # Disabled until AWS is recreated and GitHub secrets/vars are set.
+    if: false
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+    env:
+      ECS_CLUSTER: ${{ vars.PROD_ECS_CLUSTER }}
+      ECS_SERVICE: ${{ vars.PROD_ECS_SERVICE }}
+      ECS_TASK_DEFINITION: ${{ vars.PROD_ECS_TASK_DEFINITION }}
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Register new task definition revision (production)
+        id: taskdef
+        run: |
+          aws ecs describe-task-definition --task-definition "${ECS_TASK_DEFINITION}" --query 'taskDefinition' > task-definition.json
+          jq --arg IMAGE "${{ needs.build-image.outputs.image }}" '
+            .containerDefinitions[0].image = $IMAGE
+            | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)
+          ' task-definition.json > new-task-definition.json
+          TASK_DEF_ARN=$(aws ecs register-task-definition --cli-input-json file://new-task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "task_def_arn=${TASK_DEF_ARN}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy production service
+        run: |
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${ECS_SERVICE}" \
+            --task-definition "${{ steps.taskdef.outputs.task_def_arn }}" \
+            --force-new-deployment
+          aws ecs wait services-stable --cluster "${ECS_CLUSTER}" --services "${ECS_SERVICE}"

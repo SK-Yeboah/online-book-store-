@@ -19,3 +19,18 @@ Thumbs.db
 
 # ── Maven wrapper cache (the wrapper itself should be committed) ───────────────
 .mvn/wrapper/maven-wrapper.jar
+
+# ── Terraform ─────────────────────────────────────────────────────────────────
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/crash.log
+**/crash.*.log
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json
+**/.terraformrc
+**/terraform.rc
+infra/envs/**/terraform.tfvars
+!infra/envs/**/terraform.tfvars.example

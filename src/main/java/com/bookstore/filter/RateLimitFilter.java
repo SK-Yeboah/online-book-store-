@@ -19,14 +19,17 @@ import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "security.rate-limiting.enabled", havingValue = "true", matchIfMissing = true)
 public class RateLimitFilter  extends OncePerRequestFilter{
 
     // private final Map<String, Bucket> ipBuckets = new ConcurrentHashMap<>();
@@ -36,8 +39,8 @@ public class RateLimitFilter  extends OncePerRequestFilter{
 
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-    throws ServletException, IOException{
+    protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
+    throws ServletException, IOException {
 
         String clientIp = extractClientIp(request);
         

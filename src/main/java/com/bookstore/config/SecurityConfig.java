@@ -51,6 +51,18 @@ public class SecurityConfig {
     @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:5173}")
     private List<String> allowedOrigins;
 
+    /**
+     * When true (local/dev), Prometheus can scrape without a JWT.
+     * Prod sets this false — scrape via private network with an ADMIN token, or keep
+     * the metrics port off the public load balancer.
+     */
+    @Value("${security.actuator.prometheus-public:true}")
+    private boolean prometheusPublic;
+
+    /** Swagger/OpenAPI UI — disable in production. */
+    @Value("${security.swagger-public:true}")
+    private boolean swaggerPublic;
+
     @Bean
     public PasswordEncoder passwordEncoder(){
         return new BCryptPasswordEncoder(passwordEncoderStrength);
@@ -71,20 +83,31 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        // boolean isH20orDev = Arrays.stream(env.getActiveProfiles()).anyMatch("h2"::equals);
-
         http.csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .authorizeHttpRequests(auth -> auth
-                // Only the three truly-public auth endpoints are permitAll.
-                // /api/auth/logout and /api/auth/logout-all require a valid JWT.
-                .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/refresh").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/books/**").permitAll()
-                .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                .requestMatchers("/api/admin/**").hasAnyRole("ADMIN")
-                .anyRequest()
-                .authenticated()
-            )
+            .authorizeHttpRequests(auth -> {
+                var chain = auth
+                    .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/refresh").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/books/**").permitAll()
+                    .requestMatchers("/actuator/health", "/actuator/info").permitAll();
+
+                if (prometheusPublic) {
+                    chain = chain.requestMatchers("/actuator/prometheus").permitAll();
+                } else {
+                    chain = chain.requestMatchers("/actuator/prometheus").hasRole("ADMIN");
+                }
+
+                if (swaggerPublic) {
+                    chain = chain.requestMatchers(
+                            "/swagger-ui.html", "/swagger-ui/**",
+                            "/v3/api-docs", "/v3/api-docs/**").permitAll();
+                }
+
+                chain.requestMatchers("/api/admin/**").hasAnyRole("ADMIN")
+                    .requestMatchers(HttpMethod.POST, "/api/payments/webhook/**").permitAll()
+                    .anyRequest()
+                    .authenticated();
+            })
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .exceptionHandling(ex -> ex
             .authenticationEntryPoint((request, response, e) -> {
@@ -102,20 +125,19 @@ public class SecurityConfig {
                     "{\"status\":403,\"error\":\"FORBIDDEN\",\"message\":\"You do not have permission to perform this action\",\"path\":\"" + request.getRequestURI() + "\"}");
             })
         )
-        // .addFilterBefore(rateLimitFilter, JwtFilter.class)
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
-        
 
         return http.build();
-
     }
 
     private CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
         config.setExposedHeaders(List.of("Authorization"));
+        config.setAllowedHeaders(List.of(
+                "Authorization", "Content-Type", "Accept",
+                "Idempotency-key", "X-Paystack-Signature", "X-Webhook-Secret"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 
@@ -123,10 +145,4 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", config);
         return source;
     }
-
-    
-
-
-
-    
 }

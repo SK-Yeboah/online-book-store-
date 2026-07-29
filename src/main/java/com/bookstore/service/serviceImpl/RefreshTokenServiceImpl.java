@@ -6,14 +6,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import com.bookstore.entity.RefreshToken;
+import com.bookstore.entity.User;
 import com.bookstore.exception.InvalidTokenException;
-import com.bookstore.exception.ResourceNotFoundException;
 import com.bookstore.exception.TokenExpiredException;
 import com.bookstore.repository.RefreshTokenRepository;
-import com.bookstore.repository.UserRepository;
 import com.bookstore.service.RefreshTokenService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+
+import java.util.Objects;
 
 
 @Service
@@ -21,23 +22,22 @@ import lombok.RequiredArgsConstructor;
 public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
-    private final UserRepository  userRepository;
 
     @Value("${jwt.refresh-token.expiration:604800000}")
     private Long refreshTokenExpiration;
 
 
 
-    @Transactional 
+    @Transactional
     @Override
-    public RefreshToken createRefreshToken(String username){
-        com.bookstore.entity.User user = userRepository.findByUsername(username)
-        .orElseThrow(() -> new ResourceNotFoundException("User", "username", username));       
+    public RefreshToken createRefreshToken(User user) {
+        Objects.requireNonNull(user, "user");
+        Objects.requireNonNull(user.getId(), "user.id");
 
         RefreshToken token = new RefreshToken(
-            UUID.randomUUID().toString(), 
-            user,
-            Instant.now().plusMillis(refreshTokenExpiration));
+                UUID.randomUUID().toString(),
+                user,
+                Instant.now().plusMillis(refreshTokenExpiration));
 
         return refreshTokenRepository.save(token);
     }
@@ -71,7 +71,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
                 .orElseThrow(() -> new InvalidTokenException("Token not found during rotation"));
         managed.setUsed(true);
         refreshTokenRepository.save(managed);
-        return createRefreshToken(managed.getUser().getUsername());
+        return createRefreshToken(managed.getUser());
     }
 
     // Revoke single token
@@ -90,7 +90,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Scheduled(fixedRate = 3_600_000)
     @Transactional
     public void cleanupExpiredTokens(){
-        refreshTokenRepository.deleteAllExpired();
+        refreshTokenRepository.deleteAllExpired(Instant.now());
     }
 
 
